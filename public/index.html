@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Point Rotation Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .controls {
+            flex: 1;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 250px;
+        }
+        .canvas-container {
+            flex: 2;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 500px;
+            height: 500px;
+            flex: none;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .slider-container input[type="range"] {
+            flex: 1;
+        }
+        .value-display {
+            font-family: monospace;
+            color: #666;
+            min-width: 4em;
+            text-align: right;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .control-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+        }
+        .control-button:hover {
+            background-color: #45a049;
+        }
+        #removePoint {
+            background-color: #f44336;
+        }
+        #removePoint:hover {
+            background-color: #da190b;
+        }
+        .text-input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .text-controls {
+            display: flex;
+            gap: 10px;
+        }
+        .text-input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+        }
+        .text-input:focus {
+            border-color: #4CAF50;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+        .control-button.warning {
+            background-color: #ff9800;
+        }
+        .control-button.warning:hover {
+            background-color: #f57c00;
+        }
+        .control-button.secondary {
+            background-color: #757575;
+        }
+        .control-button.secondary:hover {
+            background-color: #616161;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Left Controls -->
+        <div class="controls">
+            <h2>View Controls</h2>
+            
+            <div class="control-group">
+                <h3>View Control</h3>
+                <div class="slider-container">
+                    <label>Zoom:</label>
+                    <input type="range" id="zoomFactor" min="0.2" max="2.0" step="0.1" value="1.0">
+                    <span id="zoomValue" class="value-display">1.0×</span>
+                </div>
+                <div class="button-container">
+                    <button id="resetView" class="control-button warning">Reset View</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Random Points</h3>
+                <div class="button-container">
+                    <button id="addPoint" class="control-button">+ Add Point</button>
+                    <button id="removePoint" class="control-button">- Remove Point</button>
+                    <span id="pointCount" class="value-display">0 points</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Text Display</h3>
+                <div class="text-input-container">
+                    <input type="text" id="textInput" class="text-input" 
+                           placeholder="Enter text to display" 
+                           value="Hello World">
+                    <div class="text-controls">
+                        <button id="addText" class="control-button">Add Text</button>
+                        <button id="clearText" class="control-button secondary">Clear All</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="canvas-container">
+            <canvas id="rotationCanvas"></canvas>
+        </div>
+
+        <!-- Right Controls -->
+        <div class="controls">
+            <h2>Rotation Controls</h2>
+            
+            <div class="control-group">
+                <h3>Angle of Rotation Axis</h3>
+                <div class="slider-container">
+                    <label>Angle (&phi;):</label>
+                    <input type="range" id="lineAngle" min="0" max="360" step="1" value="45">
+                    <span id="lineAngleValue" class="value-display">45°</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Angle of Plane Rotation</h3>
+                <div class="slider-container">
+                    <label>Angle (&theta;):</label>
+                    <input type="range" id="rotationAngle" min="-180" max="180" step="1" value="0">
+                    <span id="rotationAngleValue" class="value-display">0°</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Affine Transformation Matrix</h3>
+                <div id="affineMatrixContainer" style="display: flex; align-items: flex-start; gap: 10px;">
+                    <div id="affineMatrix" style="font-family: monospace; padding: 10px; background-color: #eee; border-radius: 4px;">
+                        <!-- The 2x2 matrix display -->
+                        <div style="margin-bottom: 10px; line-height: 1.2;">
+                            [ <span id="matrix-a" style="display: inline-block; min-width: 4em; text-align: right;">1.00</span>  <span id="matrix-c" style="display: inline-block; min-width: 4em; text-align: right;">0.00</span> ]<br>
+                            [ <span id="matrix-b" style="display: inline-block; min-width: 4em; text-align: right;">0.00</span>  <span id="matrix-d" style="display: inline-block; min-width: 4em; text-align: right;">1.00</span> ]
+                        </div>
+                        <!-- The equations list -->
+                        <div style="font-size: 0.9em; color: #555; line-height: 1.4;">
+                            <b>a</b> = <span id="equation-a">cos(&theta;) + cos²(&phi;)(1-cos(&theta;))</span><br>
+                            <b>b</b> = <span id="equation-b">cos(&phi;)sin(&phi;)(1-cos(&theta;))</span><br>
+                            <b>c</b> = <span id="equation-c">cos(&phi;)sin(&phi;)(1-cos(&theta;))</span><br>
+                            <b>d</b> = <span id="equation-d">cos(&theta;) + sin²(&phi;)(1-cos(&theta;))</span>
+                        </div>
+                    </div>
+                    <!-- Angle values table -->
+                    <div id="angleValues" style="font-family: monospace; font-size: 0.9em; padding-top: 10px;">
+                        <b>&phi;</b> = <span id="angle-phi">45</span>°<br>
+                        <b>&theta;</b> = <span id="angle-theta">0</span>°
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/rotation.js"></script>
+</body>
+</html> 
