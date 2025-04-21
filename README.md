@@ -1,4 +1,6 @@
-# 3D Point Rotation Demo
+# Orthographic Projection Demo
+
+<img src="Orthographic-Projection-Demo.png" alt="Affine Transformation Demo" width="50%" />
 
 This web application demonstrates the transformation of points and text laying in a 2D plane that is subject to 3D rotation of that plane about a arbitrary vector that lies in that plane. An orthographic projection is used so the Rodrigues' rotation transformation can be applied. The app allows interactive manipulation of the in-plane axis of rotation and the angle of rotation of that plane about that axis
 
