@@ -60,3 +60,6 @@ grid in the X-Y plane, with origin at window center. The +X axis is shown in red
 *   Points and text added *after* a rotation are correctly placed onto the transformed plane by applying the current rotation to their initial position.
 *   The 2D affine transformation matrix is derived mathematically from the Rodrigues formula and the orthographic projection.
 *   A simple **Node.js/Express** server (`server.js`) serves the static HTML, CSS, and JavaScript files. 
+
+## Contributions
+Kudos to Cursor 1.96.2, NodeJS v23.6.0, MacOS 15.4.1, and Gemini 2.5-pro - the tools that allowed me create this little demo app in less than 3 hours in 100% hands-off fashion.
