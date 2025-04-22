@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XForm Tester</title>
+    <script>
+        // Inline script to set theme class ASAP to prevent flicker
+        (function() {
+            const themeKey = 'transformTesterTheme';
+            const savedTheme = localStorage.getItem(themeKey);
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark-theme');
+            }
+        })();
+    </script>
     <style>
         body {
             margin: 20px;
@@ -216,9 +226,9 @@
         .rot-icon[data-axis="x"] { background-image: url('icons/x-rot.png'); }
         .rot-icon[data-axis="y"] { background-image: url('icons/y-rot.png'); }
         .rot-icon[data-axis="z"] { background-image: url('icons/z-rot.png'); }
-        body.dark-theme .rot-icon[data-axis="x"] { background-image: url('icons/x-rot-dark.png'); }
-        body.dark-theme .rot-icon[data-axis="y"] { background-image: url('icons/y-rot-dark.png'); }
-        body.dark-theme .rot-icon[data-axis="z"] { background-image: url('icons/z-rot-dark.png'); }
+        .dark-theme .rot-icon[data-axis="x"] { background-image: url('icons/x-rot-dark.png'); }
+        .dark-theme .rot-icon[data-axis="y"] { background-image: url('icons/y-rot-dark.png'); }
+        .dark-theme .rot-icon[data-axis="z"] { background-image: url('icons/z-rot-dark.png'); }
         .direction-toggle button {
             padding: 5px 0; /* Adjust padding for consistent height */
             font-size: 0.9em; /* Slightly smaller text */
@@ -311,11 +321,11 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
 
-        body.dark-theme #themeToggle {
+        .dark-theme #themeToggle {
             background-color: var(--bg-color-toggle-on);
         }
 
-        body.dark-theme #themeToggle::before {
+        .dark-theme #themeToggle::before {
             transform: translateX(36px); /* Adjust based on size/padding */
         }
 
@@ -412,6 +422,18 @@
             text-align: center;
         }
 
+        #deleteLastWaypointButton[disabled] { /* Simpler selector test */
+            background-color: #cccccc !important; /* Light grey background - Force */
+            color: #888888 !important; /* Dimmer text - Force */
+            cursor: not-allowed !important; /* Force cursor */
+        }
+
+        /* Optional: Explicitly prevent hover style changes */
+        #deleteLastWaypointButton[disabled]:hover { /* Simpler selector test */
+            background-color: #cccccc !important; /* Keep it grey - Force */
+            /* color: #888888; Keep text dim */
+        }
+
         :root {
             --bg-color-primary: #f0f0f0;
             --bg-color-secondary: #ffffff;
@@ -432,7 +454,7 @@
             --bg-color-toggle-switch: #ffffff; /* White switch */
         }
 
-        body.dark-theme {
+        .dark-theme {
             --bg-color-primary: #22272e;
             --bg-color-secondary: #2d333b;
             --text-color-primary: #cdd9e5;
@@ -450,6 +472,14 @@
             --bg-color-toggle-off: #586069; /* Dark grey when off (dark theme) */
             --bg-color-toggle-on: #3081f7;  /* Blue when on (dark theme) */
             --bg-color-toggle-switch: #22272e; /* Dark switch */
+        }
+
+        /* Utility Classes */
+        .no-select {
+            user-select: none; /* Standard */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE/Edge */
         }
     </style>
 </head>
@@ -540,7 +570,7 @@
                 <div class="control-group waypoint-controls">
                     <button id="addWaypointBtn" class="waypoint-btn">Add</button>
                     <span id="waypointCounter">0</span>
-                    <button id="deleteLastWaypointBtn" class="danger waypoint-btn">Del</button>
+                    <button id="deleteLastWaypointBtn" class="danger waypoint-btn" disabled>Del</button>
                 </div>
             </div>
         </div>
@@ -555,6 +585,7 @@
             const addWaypointButton = document.getElementById('addWaypointBtn');
             const waypointCounter = document.getElementById('waypointCounter');
             const deleteLastWaypointButton = document.getElementById('deleteLastWaypointBtn');
+            console.log("Initial check - deleteLastWaypointButton element:", deleteLastWaypointButton); // Check if element exists
             const widthInput = document.getElementById('rectWidth');
             const heightInput = document.getElementById('rectHeight');
             const applySizeButton = document.getElementById('applySize');
@@ -587,9 +618,10 @@
             let intermediatePoints = []; // Array to store {x, y, element} of intermediate points
             let selectedPointIndex = -1; // Index of the selected intermediate point
             let draggingPointIndex = -1; // Index of the point being dragged
-            let dragOffsetX = 0; // Offset of mouse click within the dragged point
+            let dragOffsetX = 0;
             let dragOffsetY = 0;
-            let selectedSavedTransitionId = null; // ID of the selected saved transition
+            let selectedSavedTransitionId = null;
+            let wasDraggingPoint = false; // Flag to prevent click after drag
 
             // --- Current Transition State ---
             let currentTransitionName = "New Transition";
@@ -608,6 +640,28 @@
 
             function saveTransitions(transitions) {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(transitions));
+            }
+
+            // --- Waypoint Counter Update --- //
+            function updateWaypointCounter() {
+                const count = intermediatePoints.length;
+                waypointCounter.textContent = count;
+                const isDisabled = count === 0;
+                console.log(`UpdateCounter: Count=${count}, isDisabled=${isDisabled}, Button Element:`, deleteLastWaypointButton); // Log before setting
+                deleteLastWaypointButton.disabled = isDisabled;
+                console.log(`UpdateCounter: AFTER setting, deleteLastWaypointButton.disabled =`, deleteLastWaypointButton.disabled); // Log after setting
+                addWaypointButton.disabled = count >= 99;
+            }
+
+            // --- Theming --- //
+            function applyTheme(theme) {
+                const htmlElement = document.documentElement; // Target <html> tag
+                if (theme === 'dark') {
+                    htmlElement.classList.add('dark-theme');
+                } else {
+                    htmlElement.classList.remove('dark-theme');
+                }
+                localStorage.setItem('transformTesterTheme', theme);
             }
 
             // --- Render Saved List ---
@@ -755,7 +809,7 @@
                 intermediatePoints = [];
                 selectedPointIndex = -1;
                 isAddingPoints = false;
-                addWaypointButton.textContent = 'Add+';
+                addWaypointButton.textContent = 'Add';
                 addWaypointButton.style.backgroundColor = '#28a745';
                 // Reset viewport cursor if it was crosshair
                 viewport.style.cursor = 'default';
@@ -964,523 +1018,24 @@
 
                      // Inject keyframes into a style tag
                      const styleSheet = document.createElement("style");
-                     styleSheet.type = "text/css";
-                     styleSheet.innerText = keyframesRule;
+                     styleSheet.textContent = `@keyframes ${keyframesName} {\n${keyframesRule}\n}`;
                      document.head.appendChild(styleSheet);
-                     console.log('Generated Keyframes:\n', keyframesRule);
-
-                     // Apply animation
-                     startRect.style.animation = `${keyframesName} ${durationSeconds}s ease-in-out forwards`; // Use forwards to keep end state
-
-                     // Clean up style tag and animation property after completion
-                     setTimeout(() => {
-                        if (startRect) { // Check if element still exists
-                             // Keep final position/transform by applying it directly before removing animation
-                             const finalTransform = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
-                             startRect.style.transform = finalTransform;
-                             startRect.style.animation = 'none'; // Remove animation property
-                             console.log('Animation finished, applied final transform');
-                        }
-                        styleSheet.remove();
-                        console.log('Cleaned up keyframes style tag');
-                    }, duration);
-
-                 } else {
-                     // Fallback to simple transition if no intermediate points
-                     console.warn("Only start/end points defined, using simple transition.");
-                     const transformValue = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
-                     startRect.style.transition = `transform ${durationSeconds}s ease-in-out`;
-                     startRect.style.transform = transformValue;
-                     // Reset after transition
-                     setTimeout(() => {
-                         if (startRect) {
-                              startRect.style.transition = 'none';
-                              startRect.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`; // Keep position, reset rotation
-                              console.log('Simple transition ended, transform partially reset.');
-                         }
-                     }, duration);
                  }
             });
 
-            // --- Replay Transition Button Logic ---
-            replayButton.addEventListener('click', () => {
-                 // Use outer scope variable startRect
-                if (!startRect) return;
-
-                // Instantly reset the green rectangle's transform and animation
-                const currentLeft = startRect.style.left;
-                const currentTop = startRect.style.top;
-                startRect.style.transition = 'none';
-                startRect.style.animation = 'none'; // Clear previous animation
-                startRect.style.left = currentLeft;
-                startRect.style.top = currentTop;
-                startRect.style.transform = ''; // Reset transform completely
-
-                // Delay slightly before starting the animation again
-                 requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                         startButton.click(); // Trigger the full animation logic
-                         console.log('Replaying transition (potentially with keyframes)...');
-                    });
-                });
-            });
-
-            // --- Rotation Direction Toggle Logic ---
-            const directionToggles = document.querySelectorAll('.direction-toggle');
-            directionToggles.forEach(toggle => {
-                const axis = toggle.dataset.axis;
-                const buttons = toggle.querySelectorAll('.btn-dir');
-                buttons.forEach(button => {
-                    button.addEventListener('click', () => {
-                        const newDirection = parseInt(button.dataset.value, 10);
-                        if (axis === 'x') xRotationDirection = newDirection;
-                        else if (axis === 'y') yRotationDirection = newDirection;
-                        else if (axis === 'z') zRotationDirection = newDirection;
-                        console.log(`Set ${axis}-axis direction to: ${newDirection}`);
-                        buttons.forEach(btn => btn.classList.remove('active'));
-                        button.classList.add('active');
-                    });
-                });
-            });
-
-             // --- Point Management Logic ---
-             // Uses viewport, addWaypointButton, removeWaypointButton from outer scope
-            addWaypointButton.addEventListener('click', () => {
-                isAddingPoints = !isAddingPoints;
-                 if (isAddingPoints) {
-                     addWaypointButton.textContent = 'Add+';
-                     addWaypointButton.style.backgroundColor = '#28a745'; // Green
-                     viewport.style.cursor = 'crosshair';
-                     selectPoint(-1); // Deselect any selected point
-                     console.log('Entered Add Waypoint mode.');
-                 } else {
-                     exitAddPointMode();
-                 }
-            });
-
-            viewport.addEventListener('click', (e) => {
-                if (!isAddingPoints || draggingPointIndex !== -1) return;
-                // Only add if clicking directly on viewport
-                if (e.target === viewport) {
-                     const vpRect = viewport.getBoundingClientRect();
-                     const x = e.clientX - vpRect.left;
-                     const y = e.clientY - vpRect.top;
-                     addIntermediatePoint(x, y);
-                     // Stay in adding mode - DO NOT exit here
-                }
-            });
-
-             // Exit Add Mode by clicking outside viewport or pressing Esc
-             document.addEventListener('click', (e) => {
-                 if (isAddingPoints && !viewport.contains(e.target) && e.target !== addWaypointButton) {
-                     console.log('Clicked outside viewport.');
-                     exitAddPointMode();
-                 }
-             });
-             document.addEventListener('keydown', (e) => {
-                 if (isAddingPoints && e.key === 'Escape') {
-                     console.log('Escape pressed.');
-                     exitAddPointMode();
-                 }
-             });
-
-            function exitAddPointMode() {
-                 if (!isAddingPoints) return;
-                 isAddingPoints = false;
-                 addWaypointButton.textContent = 'Add'; // Reset button text
-                 // Optional: Reset button background
-                 addWaypointButton.style.backgroundColor = '';
-                 viewport.style.cursor = 'default';
-                 console.log('Exited Add Waypoint mode.');
-            }
-
-            function addIntermediatePoint(x, y) {
-                const marker = document.createElement('div');
-                marker.className = 'point-marker';
-                marker.style.left = `${x}px`;
-                marker.style.top = `${y}px`;
-                viewport.appendChild(marker);
-                const pointData = { x, y, element: marker };
-                const pointIndex = intermediatePoints.length;
-                intermediatePoints.push(pointData);
-                console.log('Added waypoint'); // Less verbose log
-                updateWaypointCounter(); // Update counter
-
-                marker.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent viewport click event
-                    // Don't select points in add mode, maybe exit mode?
-                    // For now, clicking a point while adding does nothing extra
-                });
-
-                 // Make the new point draggable
-                 makePointDraggable(marker, pointIndex);
-
-                 // Check limit BEFORE adding to DOM/array
-                 if (intermediatePoints.length >= 99) {
-                     console.warn('Maximum waypoint limit (99) reached.');
-                     // Optionally exit add mode if limit is hit while adding
-                     if (isAddingPoints) {
-                         exitAddPointMode();
-                     }
-                     return; // Do not add the point
-                 }
-            }
-
-            function selectPoint(index) {
-                if (selectedPointIndex !== -1 && intermediatePoints[selectedPointIndex]) {
-                    intermediatePoints[selectedPointIndex].element.classList.remove('selected');
-                }
-                if (selectedPointIndex === index) {
-                    selectedPointIndex = -1;
-                    console.log('Deselected point', index);
-                    return; // Exit early
-                } else {
-                    selectedPointIndex = index;
-                    if (intermediatePoints[index]) { // Check point exists
-                         intermediatePoints[index].element.classList.add('selected');
-                         console.log('Selected point', index);
-                    } else {
-                        console.error('Attempted to select non-existent point at index:', index);
-                        selectedPointIndex = -1; // Reset selection
-                    }
-                }
-            }
-
-            // Renamed from removeWaypointButton listener logic
-            function removePointByIndex(indexToRemove) {
-                if (indexToRemove < 0 || indexToRemove >= intermediatePoints.length || !intermediatePoints[indexToRemove]) {
-                    console.warn('Invalid index for removePointByIndex:', indexToRemove);
-                    return;
-                }
-                console.log('Removing point', indexToRemove);
-                intermediatePoints[indexToRemove].element.remove();
-                intermediatePoints.splice(indexToRemove, 1);
-                updateWaypointCounter(); // Update counter
-
-                const oldSelectedIndex = selectedPointIndex;
-
-                // Clear selection if the removed point was selected
-                if (selectedPointIndex === indexToRemove) { // If deleting the selected point
-                    selectedPointIndex = -1; // Clear selection
-                } else if (selectedPointIndex > indexToRemove) { // If deleting a point before the selected one
-                    // Adjust selected index if it came after the removed one
-                    selectedPointIndex--;
-                }
-
-                // Adjust indices and reattach listeners for subsequent points
-                intermediatePoints.forEach((p, i) => {
-                     if (i >= indexToRemove) {
-                          // Re-index listener immediately
-                           // Re-add select listener
-                           p.element.onclick = (e) => {
-                               e.stopPropagation();
-                               selectPoint(i);
-                           };
-                         // Re-apply selected style if needed
-                         if (i === selectedPointIndex && p.element) {
-                             p.element.classList.add('selected');
-                         }
-                     }
-                });
-            }
-
-            // --- Dragging Logic (Points) ---
-            function makePointDraggable(marker, index) {
-                 let isDraggingPoint = false;
-
-                 marker.addEventListener('mousedown', (e) => {
-                     // Prevent viewport click & rect drag
-                     e.stopPropagation();
-                     // Don't drag if in add mode
-                     if (isAddingPoints) return;
-
-                     isDraggingPoint = true;
-                     draggingPointIndex = index;
-                     marker.style.cursor = 'grabbing';
-                     marker.style.transition = 'none'; // Disable transition during drag
-                     marker.style.zIndex = '10'; // Bring to front
-                     document.body.style.cursor = 'grabbing'; // Optional: change body cursor
-
-                     const rect = marker.getBoundingClientRect();
-                     // Calculate offset from mouse click to marker top-left and store in outer scope
-                     dragOffsetX = e.clientX - rect.left;
-                     dragOffsetY = e.clientY - rect.top;
-
-                     // Don't select just by starting drag, select happens on click
-                 });
-
-                 // Mousemove and Mouseup are handled globally now
-            }
-
-             // --- Global Mouse Move for Dragging Points ---
-             document.addEventListener('mousemove', (e) => {
-                 if (draggingPointIndex === -1) return; // Not dragging a point
-
-                 const pointData = intermediatePoints[draggingPointIndex];
-                 if (!pointData) return;
-
-                 const marker = pointData.element;
-                 const vpRect = viewport.getBoundingClientRect();
-
-                 // Calculate new marker top-left position relative to viewport using outer scope offsets
-                 let newX = e.clientX - vpRect.left - dragOffsetX;
-                 let newY = e.clientY - vpRect.top - dragOffsetY;
-
-                 // Update visual position
-                 marker.style.left = `${newX}px`;
-                 marker.style.top = `${newY}px`;
-             });
-
-             // --- Global Mouse Up for Dragging Points ---
-             document.addEventListener('mouseup', (e) => {
-                 if (draggingPointIndex === -1) return; // Not dragging a point
-
-                 const pointData = intermediatePoints[draggingPointIndex];
-                 const marker = pointData.element;
-                 const vpRect = viewport.getBoundingClientRect();
-
-                 marker.style.cursor = 'pointer';
-                 marker.style.transition = '';
-                 marker.style.zIndex = '3';
-                 document.body.style.cursor = 'default';
-
-                 // Get final position relative to viewport
-                 const finalX = parseFloat(marker.style.left); // This is top-left
-                 const finalY = parseFloat(marker.style.top);
-                 const markerWidth = marker.offsetWidth;
-                 const markerHeight = marker.offsetHeight;
-
-                 // Check if center of marker is outside viewport bounds
-                 const centerX = finalX + markerWidth / 2;
-                 const centerY = finalY + markerHeight / 2;
-
-                 const isOutside = (
-                     centerX < 0 ||
-                     centerX > vpRect.width ||
-                     centerY < 0 ||
-                     centerY > vpRect.height
-                 );
-
-                 if (isOutside) {
-                     console.log(`Point ${draggingPointIndex} dragged outside - deleting.`);
-                     removePointByIndex(draggingPointIndex);
-                 } else {
-                     // Update the data array with the new constrained position
-                     pointData.x = finalX;
-                     pointData.y = finalY;
-                     console.log(`Point ${draggingPointIndex} moved to:`, pointData.x, pointData.y);
-                      // Optionally re-select after move, or clear selection
-                      selectPoint(-1); // Deselect after move
-                 }
-
-                 draggingPointIndex = -1; // Stop dragging
-             });
-
-            // --- Theming --- (Moved theme logic here)
-            function applyTheme(theme) {
-                if (theme === 'dark') {
-                    document.body.classList.add('dark-theme');
-                } else {
-                    document.body.classList.remove('dark-theme');
-                }
-                localStorage.setItem('transformTesterTheme', theme);
-            }
-
-            themeToggleButton.addEventListener('click', () => {
-                const currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                applyTheme(newTheme);
-            });
-
-            // Load saved theme on startup
+            // Load saved theme on startup - Add this line back
             const savedTheme = localStorage.getItem('transformTesterTheme') || 'light';
-            applyTheme(savedTheme);
 
-            // --- Save Button Logic (for Current Configuration) ---
-            saveButton.addEventListener('click', () => {
-                if (!startRect || !endRect) {
-                    alert('Cannot save, rectangles not initialized.');
-                    return;
-                }
-
-                 // Assign name/ID if it's still "New Transition" and hasn't run
-                 if (currentTransitionName === "New Transition" && !currentTransitionHasRun) {
-                     currentTransitionId = Date.now();
-                     currentTransitionName = `Transition ${new Date(currentTransitionId).toLocaleString()}`;
-                     console.log('Assigning default name/ID before saving:', currentTransitionName, currentTransitionId);
-                 } else if (!currentTransitionId) {
-                     // Has a custom name but no ID yet (wasn't run/loaded)
-                     currentTransitionId = Date.now();
-                     console.log('Assigning new ID before saving custom name:', currentTransitionId);
-                 }
-
-                const transitionToSave = {
-                    id: currentTransitionId,
-                    name: currentTransitionName,
-                    duration: parseInt(durationInput.value, 10),
-                    rectWidth: parseInt(widthInput.value, 10),
-                    rectHeight: parseInt(heightInput.value, 10),
-                    startX: startRect.style.left,
-                    startY: startRect.style.top,
-                    endX: endRect.style.left,
-                    endY: endRect.style.top,
-                    points: intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Save only coords
-                    rotX: xRotationDirection,
-                    rotY: yRotationDirection,
-                    rotZ: zRotationDirection
-                };
-
-                let transitions = getSavedTransitions();
-                const existingIndex = transitions.findIndex(t => t.id === transitionToSave.id);
-
-                if (existingIndex !== -1) {
-                    // Update existing transition
-                    transitions[existingIndex] = transitionToSave;
-                    console.log('Updated existing transition in localStorage:', transitionToSave);
-                } else {
-                    // Add as new transition
-                    transitions.push(transitionToSave);
-                    console.log('Saved new transition:', transitionToSave);
-                }
-                saveTransitions(transitions);
-
-                renderSavedList(); // Refresh the list
-                 // Provide visual feedback via the button itself (optional)
-                 saveButton.textContent = 'Saved!';
-                 saveButton.style.backgroundColor = '#28a745'; // Green flash
-                 setTimeout(() => {
-                     saveButton.textContent = 'Save Current Configuration';
-                     saveButton.style.backgroundColor = ''; // Reset color
-                 }, 1000);
-            });
-
-            // --- Rename Saved Transition ---
-            renameButton.addEventListener('click', () => {
-                if (!selectedSavedTransitionId) return;
-                const newName = renameInput.value.trim();
-                if (!newName) {
-                    alert('Please enter a valid name.');
-                    return;
-                }
-
-                let transitions = getSavedTransitions();
-                const index = transitions.findIndex(t => t.id === selectedSavedTransitionId);
-                if (index !== -1) {
-                    transitions[index].name = newName;
-                    saveTransitions(transitions);
-                    console.log('Renamed transition', selectedSavedTransitionId, 'to', newName);
-                    renderSavedList(); // Re-render to show new name and clear selection
-                } else {
-                    console.error('Could not find transition to rename:', selectedSavedTransitionId);
-                }
-            });
-
-            // --- Delete Saved Transition ---
-            deleteButton.addEventListener('click', () => {
-                if (!selectedSavedTransitionId) return;
-                if (!confirm('Are you sure you want to delete this saved transition?')) {
-                    return;
-                }
-
-                let transitions = getSavedTransitions();
-                transitions = transitions.filter(t => t.id !== selectedSavedTransitionId);
-                saveTransitions(transitions);
-                console.log('Deleted transition', selectedSavedTransitionId);
-                renderSavedList(); // Re-render list and clear selection
-            });
-
-            // --- Replay Saved Transition ---
-            replaySavedButton.addEventListener('click', () => {
-                if (!selectedSavedTransitionId) return;
-
-                const transitions = getSavedTransitions();
-                const savedState = transitions.find(t => t.id === selectedSavedTransitionId);
-                if (!savedState) {
-                    alert('Error: Could not find saved transition data.');
-                    return;
-                }
-
-                console.log('Loading and replaying saved state:', savedState.id);
-
-                // 0. Update Current Transition State
-                currentTransitionName = savedState.name;
-                currentTransitionId = savedState.id;
-                currentTransitionHasRun = true; // Mark as run since it's loaded
-
-                // 1. Restore State
-                // Clear current intermediate points visually and from array
-                 intermediatePoints.forEach(p => p.element.remove());
-                 intermediatePoints = [];
-                 selectedPointIndex = -1;
-
-                 // Set Rect sizes
-                 widthInput.value = savedState.rectWidth;
-                 heightInput.value = savedState.rectHeight;
-                 applySizeButton.click(); // Trigger resize logic (includes recentering)
-
-                 // Set Rect positions (ensure they exist first)
-                 if (startRect) {
-                     startRect.style.left = savedState.startX;
-                     startRect.style.top = savedState.startY;
-                     startRect.style.transform = ''; // Reset transform before replay
-                     startRect.style.animation = 'none'; // Reset animation
-                 }
-                 if (endRect) {
-                     endRect.style.left = savedState.endX;
-                     endRect.style.top = savedState.endY;
-                 }
-
-                 // Recreate intermediate points
-                 savedState.points.forEach(p => addIntermediatePoint(p.x, p.y));
-
-                 // Set duration
-                 durationInput.value = savedState.duration;
-
-                 // Set rotation directions (update state vars and button UI)
-                 xRotationDirection = savedState.rotX;
-                 yRotationDirection = savedState.rotY;
-                 zRotationDirection = savedState.rotZ;
-                 document.querySelectorAll('.direction-toggle').forEach(toggle => {
-                     const axis = toggle.dataset.axis;
-                     let currentDir;
-                     if (axis === 'x') currentDir = xRotationDirection;
-                     else if (axis === 'y') currentDir = yRotationDirection;
-                     else if (axis === 'z') currentDir = zRotationDirection;
-                     toggle.querySelectorAll('.btn-dir').forEach(btn => {
-                         btn.classList.toggle('active', parseInt(btn.dataset.value) === currentDir);
-                     });
-                 });
-
-                // 2. Trigger Replay
-                // Use a slight delay to ensure DOM updates from state restoration are processed
-                setTimeout(() => {
-                    replayButton.click(); // Click the main replay button
-                }, 50); // 50ms delay
-
-                // Update the name displayed in the saved list if it was selected
-                const listItem = savedListUl.querySelector(`li[data-id="${savedState.id}"]`);
-                if (listItem && listItem.classList.contains('selected')) {
-                   const nameSpan = listItem.querySelector('.transition-name');
-                   if (nameSpan) nameSpan.textContent = currentTransitionName;
-                }
-
-                startButton.textContent = 'Run Loaded'; // Update main button text
-            });
-
-            // --- Waypoint Counter Update ---
-            function updateWaypointCounter() {
-                const count = intermediatePoints.length;
-                waypointCounter.textContent = count;
-                deleteLastWaypointButton.disabled = count === 0;
-                addWaypointButton.disabled = count >= 99;
-            }
-
-            // --- Initial Call ---
+            // --- Initial Call --- //
             initializeRects();
-            renderSavedList(); // Load and display saved list on startup
-            updateWaypointCounter(); // Set initial counter and button state
+            renderSavedList();
+            applyTheme(savedTheme);
+            updateWaypointCounter(); // Set initial counter and Del button state
+ 
+            addWaypointButton.textContent = 'Add'; // Force final state
+            console.log("End of DOMContentLoaded. Add button text:", addWaypointButton.textContent); // Final check
+ 
         });
     </script>
-
 </body>
-</html> 
+</html>
