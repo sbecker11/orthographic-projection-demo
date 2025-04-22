@@ -1,253 +1,68 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transform Tester</title>
-    <style>
-        body {
-            margin: 20px;
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .container {
-            display: flex;
-            gap: 20px;
-            width: 100%;
-            max-width: 1200px;
-            margin-top: 20px;
-        }
-        .viewport-container {
-            flex-grow: 1;
-            position: relative; /* Needed for absolute positioning of rects */
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-            width: 600px; /* Fixed width */
-            height: 500px; /* Fixed height */
-            border: 1px solid #ccc;
-            perspective: 1000px; /* Enable 3D space for children */
-        }
-        .rect {
-            position: absolute;
-            width: 100px;
-            height: 60px;
-            border-radius: 4px;
-            cursor: grab;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            text-shadow: 1px 1px 2px black;
-            box-sizing: border-box; /* Include padding/border in element's total width and height */
-            transform-style: preserve-3d; /* Important for containing 3D transforms */
-            transition: transform 0.5s ease-in-out; /* Default transition */
-        }
-        .rect-start {
-            background-color: rgba(0, 128, 0, 0.8); /* Green, semi-transparent */
-            border: 2px solid darkgreen;
-            z-index: 1; /* Start rect below */
-            cursor: grab; /* Make it grabbable */
-        }
-        .rect-end {
-            background-color: rgba(255, 0, 0, 0.8); /* Red, semi-transparent */
-            border: 2px solid darkred;
-            z-index: 2; /* End rect above, draggable */
-        }
-        .rect-end:active {
-            cursor: grabbing;
-        }
-        .controls, .saved-transitions {
-            flex-basis: 300px;
-            flex-shrink: 0;
-            padding: 20px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            height: fit-content;
-        }
-        .control-group, .transition-item {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input[type="number"], input[type="text"] {
-            width: calc(100% - 16px);
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
-        button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-            margin-right: 5px;
-            margin-bottom: 5px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button.secondary {
-            background-color: #6c757d;
-        }
-        button.secondary:hover {
-            background-color: #5a6268;
-        }
-         button.danger {
-            background-color: #dc3545;
-        }
-        button.danger:hover {
-            background-color: #c82333;
-        }
-        .saved-transitions ul {
-            list-style: none;
-            padding: 0;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-         .saved-transitions li {
-            padding: 10px;
-            border: 1px solid #eee;
-            margin-bottom: 5px;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-        .saved-transitions li:hover {
-            background-color: #f8f9fa;
-        }
-        .saved-transitions li.selected {
-            background-color: #e0e0e0;
-            font-weight: bold;
-        }
-        .transition-name {
-             flex-grow: 1;
-             margin-right: 10px;
-             overflow: hidden;
-             text-overflow: ellipsis;
-             white-space: nowrap;
-        }
-        .direction-toggle button {
-            padding: 5px 10px;
-            font-size: 1em;
-            min-width: 35px; /* Slightly smaller to fit 3 buttons */
-            margin-left: 5px;
-        }
-        .direction-toggle button.active {
-            background-color: #28a745; /* Green for active */
-            border: 1px solid #1e7e34;
-        }
-        .direction-toggle button:not(.active) {
-            background-color: #6c757d; /* Grey for inactive */
-            opacity: 0.7;
-        }
-        /* Specific style for active zero button */
-        .direction-toggle button[data-value="0"].active {
-             background-color: #ffc107; /* Yellow for zero */
-             color: #333;
-             border-color: #e0a800;
-             opacity: 1.0;
-        }
-        .point-marker {
-            position: absolute;
-            width: 15px;
-            height: 15px;
-            background-color: rgba(0, 0, 255, 0.7);
-            border: 1px solid darkblue;
-            border-radius: 50%;
-            cursor: pointer;
-            transform: translate(-50%, -50%); /* Center the marker on the click point */
-            z-index: 3; /* Above rects */
-        }
-        .point-marker.selected {
-            background-color: rgba(0, 255, 255, 0.9); /* Cyan when selected */
-            border: 2px solid teal;
-        }
-
-    </style>
-</head>
-<body>
-
-    <h1>Transform Tester</h1>
+    <div id="pageHeader">
+        <h1>XForm Tester</h1>
+        <button id="themeToggle">Toggle Theme</button>
+    </div>
 
     <div id="currentConfigHeader" style="margin-bottom: 15px; text-align: center;">
-        <h2 id="currentTransitionNameDisplay" style="display: inline-block; margin: 0 10px 0 0;">New Transition</h2>
-        <button id="editCurrentNameBtn" style="display: none; font-size: 0.8em; padding: 3px 8px;" class="secondary">Edit Name</button>
-        <input type="text" id="editCurrentNameInput" style="display: none; margin-right: 5px;" />
-        <button id="saveCurrentNameBtn" style="display: none; font-size: 0.8em; padding: 3px 8px;">Save Name</button>
     </div>
 
     <div class="container">
-        <!-- Left: Viewport -->
-        <div class="viewport-container" id="viewport">
-            <!-- Rectangles will be added here by JS -->
+        <!-- Left Column: Controls -->
+        <div class="column controls-left">
+            <h2>Controls</h2>
+            <div class="control-group">
+                <label for="duration">Transition Duration (ms):</label>
+                <input type="number" id="duration" value="500" min="0" step="50">
+            </div>
+             <div class="control-group">
+                 <button id="startTransition">Start Transition</button>
+                 <button id="replayTransitionBtn">Replay Transition</button>
+                 <button id="resetPositions">Reset Positions</button>
+            </div>
+             <div class="control-group">
+                <label>Rotation Directions:</label>
+                <div class="direction-toggle" data-axis="x" data-direction="1">
+                    <span>X-Axis:</span>
+                    <button class="btn-dir active" data-value="1">+</button>
+                    <button class="btn-dir" data-value="-1">-</button>
+                    <button class="btn-dir" data-value="0">0</button>
+                </div>
+                 <div class="direction-toggle" data-axis="y" data-direction="1">
+                     <span>Y-Axis:</span>
+                    <button class="btn-dir active" data-value="1">+</button>
+                    <button class="btn-dir" data-value="-1">-</button>
+                    <button class="btn-dir" data-value="0">0</button>
+                </div>
+                 <div class="direction-toggle" data-axis="z" data-direction="1">
+                     <span>Spin (Z):</span>
+                    <button class="btn-dir active" data-value="1">+</button>
+                    <button class="btn-dir" data-value="-1">-</button>
+                    <button class="btn-dir" data-value="0">0</button>
+                </div>
+            </div>
+             <div class="control-group">
+                <label for="rectWidth">Rect Width (px):</label>
+                <input type="number" id="rectWidth" value="100" min="10">
+                <label for="rectHeight">Rect Height (px):</label>
+                <input type="number" id="rectHeight" value="60" min="10">
+                <button id="applySize">Apply Size</button>
+             </div>
+             <div class="control-group">
+                 <button id="addPointBtn">Add Intermediate Point</button>
+                 <button id="removePointBtn" class="danger" disabled>Remove Selected Point</button>
+            </div>
         </div>
 
-        <!-- Right: Controls and Saved Transitions -->
-        <div style="display: flex; flex-direction: column; gap: 20px;">
-            <div class="controls">
-                <h2>Controls</h2>
-                <div class="control-group">
-                    <label for="duration">Transition Duration (ms):</label>
-                    <input type="number" id="duration" value="500" min="0" step="50">
-                </div>
-                <div class="control-group">
-                     <button id="startTransition">Start Transition</button>
-                     <button id="replayTransitionBtn">Replay Transition</button>
-                     <button id="resetPositions">Reset Positions</button>
-                </div>
-                 <div class="control-group">
-                    <label>Rotation Directions:</label>
-                    <div class="direction-toggle" data-axis="x" data-direction="1">
-                        <span>X-Axis:</span>
-                        <button class="btn-dir active" data-value="1">+</button>
-                        <button class="btn-dir" data-value="-1">-</button>
-                        <button class="btn-dir" data-value="0">0</button>
-                    </div>
-                     <div class="direction-toggle" data-axis="y" data-direction="1">
-                         <span>Y-Axis:</span>
-                        <button class="btn-dir active" data-value="1">+</button>
-                        <button class="btn-dir" data-value="-1">-</button>
-                        <button class="btn-dir" data-value="0">0</button>
-                    </div>
-                     <div class="direction-toggle" data-axis="z" data-direction="1">
-                         <span>Spin (Z):</span>
-                        <button class="btn-dir active" data-value="1">+</button>
-                        <button class="btn-dir" data-value="-1">-</button>
-                        <button class="btn-dir" data-value="0">0</button>
-                    </div>
-                </div>
-                 <div class="control-group">
-                    <label for="rectWidth">Rect Width (px):</label>
-                    <input type="number" id="rectWidth" value="100" min="10">
-                    <label for="rectHeight">Rect Height (px):</label>
-                    <input type="number" id="rectHeight" value="60" min="10">
-                    <button id="applySize">Apply Size</button>
-                 </div>
-                 <div class="control-group">
-                     <button id="addPointBtn">Add Intermediate Point</button>
-                     <button id="removePointBtn" class="danger" disabled>Remove Selected Point</button>
-                 </div>
-                 <div class="control-group">
-                     <button id="saveTransition">Save Current Configuration</button>
-                 </div>
+        <!-- Center Column: Viewport -->
+        <div class="column viewport-center">
+            <div class="viewport-container" id="viewport">
+                <!-- Rectangles will be added here by JS -->
             </div>
+        </div>
 
-            <div class="saved-transitions">
+        <!-- Right Column: Persistence -->
+        <div class="column persistence-right">
+             <div class="saved-transitions">
                 <h2>Saved Transitions</h2>
                  <ul id="savedList">
                     <!-- Saved transitions will be listed here -->
@@ -260,958 +75,233 @@
                      <button id="replayTransition">Replay Selected</button>
                  </div>
             </div>
+            <div class="control-group" style="margin-top: 20px; padding: 20px; background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                 <button id="saveTransition">Save Current Configuration</button>
+            </div>
         </div>
+
     </div>
+
+    <style>
+        /* --- CSS Variables --- */
+        :root {
+            --bg-color: #f0f0f0;
+            --text-color: #333;
+            --panel-bg: white;
+            --panel-border: #ccc;
+            --button-bg: #007bff;
+            --button-hover-bg: #0056b3;
+            --button-text: white;
+            --input-border: #ccc;
+            --input-bg: white;
+            --rect-start-bg: rgba(0, 128, 0, 0.8);
+            --rect-start-border: darkgreen;
+            --rect-end-bg: rgba(255, 0, 0, 0.8);
+            --rect-end-border: darkred;
+            --point-marker-bg: rgba(0, 0, 255, 0.7);
+            --point-marker-border: darkblue;
+            --point-marker-selected-bg: rgba(0, 255, 255, 0.9);
+            --point-marker-selected-border: teal;
+            --shadow-color: rgba(0,0,0,0.1);
+            --link-color: #007bff;
+            --list-item-hover-bg: #f8f9fa;
+            --list-item-selected-bg: #e0e0e0;
+        }
+
+        /* --- Base Styles --- */
+        body {
+            margin: 0; /* Remove default margin */
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+            /* display: flex; */ /* Let body flow naturally */
+            /* flex-direction: column; */
+            /* align-items: center; */
+        }
+         #pageHeader {
+             width: 100%;
+             display: flex;
+             justify-content: center; /* Center H1 */
+             align-items: center;
+             padding: 0 20px; /* Padding for button */
+             box-sizing: border-box;
+             margin-bottom: 15px;
+             position: relative; /* For positioning toggle button */
+        }
+        #pageHeader h1 {
+             margin: 0;
+             text-align: center;
+        }
+        #themeToggle {
+            position: absolute; /* Position relative to header */
+            right: 20px; /* Align to right padding */
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 5px 10px;
+            font-size: 0.9em;
+            cursor: pointer;
+            background-color: var(--panel-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+
+        /* --- Layout Overrides for 3 Columns --- */
+        .container {
+            max-width: 1600px; /* Allow container to be wider */
+            align-items: flex-start; /* Align columns to the top */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            background-color: var(--panel-bg);
+        }
+        .column {
+            /* Base styles for all columns */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: fit-content; /* Prevent columns stretching vertically */
+        }
+        .controls-left, .persistence-right {
+            flex: 1; /* Allow left and right columns to share remaining space */
+            min-width: 280px; /* Minimum width for controls */
+            max-width: 350px; /* Optional: Max width */
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            background-color: var(--panel-bg);
+        }
+        .viewport-center {
+            flex-shrink: 0; /* Prevent viewport from shrinking */
+        }
+        .viewport-container {
+            /* flex-grow: 1; */ /* No longer needed */
+            position: relative;
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            overflow: hidden;
+            width: 500px;
+            height: 500px;
+            border: 1px solid var(--panel-border);
+            perspective: 1000px;
+        }
+        .rect {
+            /* flex-grow: 1; */ /* No longer needed as it's in a fixed-width column */
+            /* Position, size, border etc. remain from original styles */
+        }
+        .rect-start {
+            background-color: var(--rect-start-bg);
+            border: 2px solid var(--rect-start-border);
+            z-index: 1; /* Start rect below */
+            /* flex-grow: 1; */ /* No longer needed as it's in a fixed-width column */
+            /* Position, size, border etc. remain from original styles */
+        }
+        .rect-end {
+            background-color: var(--rect-end-bg);
+            border: 2px solid var(--rect-end-border);
+            z-index: 2; /* End rect above, draggable */
+            /* flex-grow: 1; */ /* No longer needed as it's in a fixed-width column */
+            /* Position, size, border etc. remain from original styles */
+        }
+        input[type="number"], input[type="text"] {
+            width: calc(100% - 16px);
+            padding: 8px;
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+        button {
+            border-radius: 4px;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: var(--button-hover-bg);
+        }
+        button.secondary {
+            /* flex-grow: 1; */ /* No longer needed as it's in a fixed-width column */
+            /* Position, size, border etc. remain from original styles */
+        }
+        .point-marker {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: var(--point-marker-bg);
+            border: 1px solid var(--point-marker-border);
+            border-radius: 50%;
+            /* flex-grow: 1; */ /* No longer needed as it's in a fixed-width column */
+            /* Position, size, border etc. remain from original styles */
+        }
+        .point-marker.selected {
+            background-color: var(--point-marker-selected-bg);
+            border: 2px solid var(--point-marker-selected-border);
+        }
+        .saved-transitions li:hover {
+            /* background-color: #f8f9fa; */
+             background-color: var(--list-item-hover-bg);
+        }
+        .saved-transitions li.selected {
+            /* background-color: #e0e0e0; */
+             background-color: var(--list-item-selected-bg);
+            font-weight: bold;
+        }
+        /* Specific style for active zero button */
+        .direction-toggle button[data-value="0"].active {
+             /* background-color: #ffc107; */ /* Yellow for zero */
+             /* color: #333; */
+             /* border-color: #e0a800; */
+             background-color: orange; /* Using name for easier dark mode */
+             color: black;
+             border-color: darkorange;
+             opacity: 1.0;
+        }
+
+        /* --- Dark Mode Overrides --- */
+        body.dark-mode {
+            --bg-color: #2d2d2d;
+            --text-color: #e0e0e0;
+            --panel-bg: #3c3c3c;
+            --panel-border: #555;
+            --button-bg: #0056b3;
+            --button-hover-bg: #007bff;
+            --button-text: #e0e0e0;
+            --input-border: #555;
+            --input-bg: #4a4a4a;
+            --rect-start-bg: rgba(0, 150, 0, 0.7);
+            --rect-start-border: lightgreen;
+            --rect-end-bg: rgba(200, 0, 0, 0.7);
+            --rect-end-border: #ff4d4d;
+            --point-marker-bg: rgba(100, 100, 255, 0.7);
+            --point-marker-border: lightblue;
+            --point-marker-selected-bg: rgba(0, 200, 200, 0.9);
+            --point-marker-selected-border: cyan;
+            --shadow-color: rgba(0,0,0,0.4);
+            --link-color: #64b5f6;
+            --list-item-hover-bg: #4f4f4f;
+            --list-item-selected-bg: #616161;
+        }
+         body.dark-mode #themeToggle {
+             background-color: var(--panel-bg);
+             color: var(--text-color);
+             border: 1px solid var(--input-border);
+         }
+         body.dark-mode .direction-toggle button[data-value="0"].active {
+              background-color: darkorange; /* Adjust zero button for dark mode */
+              color: #111;
+              border-color: orange;
+         }
+
+    </style>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOM Loaded. Initializing Transform Tester...');
-
-            // --- DOM Elements (Declare ONCE) ---
-            const viewport = document.getElementById('viewport');
-            const addPointButton = document.getElementById('addPointBtn');
-            const removePointButton = document.getElementById('removePointBtn');
-            const widthInput = document.getElementById('rectWidth');
-            const heightInput = document.getElementById('rectHeight');
-            const applySizeButton = document.getElementById('applySize');
-            const durationInput = document.getElementById('duration');
-            const startButton = document.getElementById('startTransition');
-            const replayButton = document.getElementById('replayTransitionBtn');
-            const resetButton = document.getElementById('resetPositions');
-            const savedListUl = document.getElementById('savedList');
-            const selectedControlsDiv = document.getElementById('selectedTransitionControls');
-            const renameInput = document.getElementById('renameInput');
-            const renameButton = document.getElementById('renameTransition');
-            const deleteButton = document.getElementById('deleteTransition');
-            const replaySavedButton = document.getElementById('replayTransition'); // In selected controls
-            const currentNameDisplay = document.getElementById('currentTransitionNameDisplay');
-            const editCurrentNameButton = document.getElementById('editCurrentNameBtn');
-            const editCurrentNameInput = document.getElementById('editCurrentNameInput');
-            const saveCurrentNameButton = document.getElementById('saveCurrentNameBtn');
-            const saveButton = document.getElementById('saveTransition'); // Main save button
-
-            // NOTE: startRect and endRect are created dynamically, so use 'let'
-            let startRect = null;
-            let endRect = null;
-
-            // --- State Variables ---
-            let xRotationDirection = 1;
-            let yRotationDirection = 1;
-            let zRotationDirection = 1;
-            let isAddingPoints = false; // State flag for adding points mode
-            let intermediatePoints = []; // Array to store {x, y, element} of intermediate points
-            let selectedPointIndex = -1; // Index of the selected intermediate point
-            let draggingPointIndex = -1; // Index of the point being dragged
-            let dragOffsetX = 0; // Offset of mouse click within the dragged point
-            let dragOffsetY = 0;
-            let selectedSavedTransitionId = null; // ID of the selected saved transition
-
-            // --- Current Transition State ---
-            let currentTransitionName = "New Transition";
-            let currentTransitionId = null; // Can be null (new) or a timestamp (run/loaded/saved)
-            let currentTransitionHasRun = false;
-
-            // --- LocalStorage Keys ---
-            const STORAGE_KEY = 'transformTester_savedTransitions';
-
-
-            // --- LocalStorage Helpers ---
-            function getSavedTransitions() {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                return saved ? JSON.parse(saved) : [];
-            }
-
-            function saveTransitions(transitions) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(transitions));
-            }
-
-            // --- Render Saved List ---
-            function renderSavedList() {
-                const transitions = getSavedTransitions();
-                savedListUl.innerHTML = ''; // Clear existing list
-                selectedSavedTransitionId = null; // Clear selection
-                selectedControlsDiv.style.display = 'none'; // Hide controls
-
-                if (transitions.length === 0) {
-                    savedListUl.innerHTML = '<li>No transitions saved yet.</li>';
-                    return;
-                }
-
-                transitions.forEach(t => {
-                    const li = document.createElement('li');
-                    li.dataset.id = t.id;
-
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'transition-name';
-                    nameSpan.textContent = t.name;
-                    li.appendChild(nameSpan);
-
-                    // Simple indication of complexity (optional)
-                    const detailsSpan = document.createElement('span');
-                    detailsSpan.style.fontSize = '0.8em';
-                    detailsSpan.style.color = '#6c757d';
-                    detailsSpan.textContent = `(${t.points.length} pts)`;
-                    li.appendChild(detailsSpan);
-
-                    li.addEventListener('click', () => {
-                        // Remove selected class from previous
-                        Array.from(savedListUl.querySelectorAll('li.selected')).forEach(el => el.classList.remove('selected'));
-
-                        // Toggle selection
-                        if (selectedSavedTransitionId === t.id) {
-                            selectedSavedTransitionId = null;
-                            selectedControlsDiv.style.display = 'none';
-                        } else {
-                            selectedSavedTransitionId = t.id;
-                            li.classList.add('selected');
-                            renameInput.value = t.name; // Pre-fill rename input
-                            selectedControlsDiv.style.display = 'block';
-                            console.log('Selected saved transition:', t.id);
-                        }
-                    });
-                    savedListUl.appendChild(li);
-                });
-            }
-
-            // --- Bezier/Spline Calculation Helpers ---
-            // Calculates control points for a segment p1-p2 based on neighbors p0, p3 and tension
-            function getControlPoints(p0, p1, p2, p3, tension = 0.5) {
-                // Catmull-Rom to Cubic Bezier conversion formula
-                const d1x = (p2.x - p0.x) * tension;
-                const d1y = (p2.y - p0.y) * tension;
-                const d2x = (p3.x - p1.x) * tension;
-                const d2y = (p3.y - p1.y) * tension;
-
-                const cp1 = { x: p1.x + d1x / 3, y: p1.y + d1y / 3 };
-                const cp2 = { x: p2.x - d2x / 3, y: p2.y - d2y / 3 };
-                return [cp1, cp2];
-            }
-
-            // Calculates a point on a cubic Bezier curve defined by p0, cp1, cp2, p1 at time t (0-1)
-            function getPointOnCubicBezier(p0, cp1, cp2, p1, t) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-                const mt = 1 - t;
-                const mt2 = mt * mt;
-                const mt3 = mt2 * mt;
-
-                const x = mt3 * p0.x + 3 * mt2 * t * cp1.x + 3 * mt * t2 * cp2.x + t3 * p1.x;
-                const y = mt3 * p0.y + 3 * mt2 * t * cp1.y + 3 * mt * t2 * cp2.y + t3 * p1.y;
-                return { x, y };
-            }
-
-            // Generates a dense list of points along a spline path defined by the input points
-            function generateSplinePath(points, samplesPerSegment = 30) {
-                if (points.length < 2) return points;
-
-                const path = [points[0]]; // Start with the first point
-                const numSegments = points.length - 1;
-
-                for (let i = 0; i < numSegments; i++) {
-                    const p0 = points[Math.max(0, i - 1)]; // Previous point (or p0 if i=0)
-                    const p1 = points[i];                     // Start of segment
-                    const p2 = points[i + 1];                 // End of segment
-                    const p3 = points[Math.min(numSegments, i + 2)]; // Next point (or pN if i=N-1)
-
-                    const [cp1, cp2] = getControlPoints(p0, p1, p2, p3);
-
-                    // Sample points along this cubic Bezier segment
-                    for (let t = 1; t <= samplesPerSegment; t++) {
-                        const sampleT = t / samplesPerSegment;
-                        path.push(getPointOnCubicBezier(p1, cp1, cp2, p2, sampleT));
-                    }
-                }
-                // Ensure the very last point is included exactly if needed (sampling might slightly miss)
-                // path.push(points[points.length - 1]); // Usually sampling gets close enough
-                return path;
-            }
-
-            // --- Initial Setup ---
-            function initializeRects() {
-                // Clear existing rects if any (for reset)
-                viewport.innerHTML = '';
-
-                // Create and Style Start Rect (Green)
-                startRect = document.createElement('div'); // Assign to outer 'let' variable
-                startRect.id = 'startRect';
-                startRect.className = 'rect rect-start';
-                startRect.textContent = 'Start';
-                viewport.appendChild(startRect);
-                // Center it initially
-                const vpRect = viewport.getBoundingClientRect();
-                 // Apply current size from inputs before getting bounding rect
-                const currentWidth = parseInt(widthInput.value, 10);
-                const currentHeight = parseInt(heightInput.value, 10);
-                if (!isNaN(currentWidth) && currentWidth >= 10) startRect.style.width = `${currentWidth}px`;
-                if (!isNaN(currentHeight) && currentHeight >= 10) startRect.style.height = `${currentHeight}px`;
-                const sRect = startRect.getBoundingClientRect(); // Get bounds after setting size
-                const initialX = (vpRect.width - sRect.width) / 2;
-                const initialY = (vpRect.height - sRect.height) / 2;
-                startRect.style.left = `${initialX}px`;
-                startRect.style.top = `${initialY}px`;
-                startRect.style.transform = ''; // Reset transform
-
-                // Create and Style End Rect (Red) - initially same as start
-                endRect = document.createElement('div'); // Assign to outer 'let' variable
-                endRect.id = 'endRect';
-                endRect.className = 'rect rect-end';
-                endRect.textContent = 'End';
-                // Apply current size
-                if (!isNaN(currentWidth) && currentWidth >= 10) endRect.style.width = `${currentWidth}px`;
-                if (!isNaN(currentHeight) && currentHeight >= 10) endRect.style.height = `${currentHeight}px`;
-                viewport.appendChild(endRect);
-                endRect.style.left = `${initialX}px`;
-                endRect.style.top = `${initialY}px`;
-                endRect.style.transform = ''; // Reset transform
-
-                console.log('Rects Initialized at:', initialX, initialY);
-                // Clear old intermediate points
-                intermediatePoints.forEach(p => p.element.remove());
-                intermediatePoints = [];
-                selectedPointIndex = -1;
-                isAddingPoints = false;
-                addPointButton.textContent = 'Add Intermediate Point';
-                addPointButton.style.backgroundColor = '';
-                removePointButton.disabled = true;
-
-                 // Re-attach drag listener
-                 if (startRect) makeDraggable(startRect);
-                 if (endRect) makeDraggable(endRect);
-
-                 // Reset current transition state
-                 currentTransitionName = "New Transition";
-                 currentTransitionId = null;
-                 currentTransitionHasRun = false;
-                 updateCurrentNameDisplay();
-                 startButton.textContent = 'Start Transition'; // Reset button text
-            }
-
-            // --- Dragging Logic ---
-            function makeDraggable(element) {
-                let isDragging = false;
-                let startX, startY, initialMouseX, initialMouseY;
-
-                element.addEventListener('mousedown', (e) => {
-                    // Ensure element is valid
-                    if (!element) return;
-                    isDragging = true;
-                    element.style.cursor = 'grabbing';
-                    element.style.transition = 'none'; // Disable transition during drag
-
-                    // Record initial position of the element and mouse
-                    const rect = element.getBoundingClientRect();
-                    const viewportRect = viewport.getBoundingClientRect();
-
-                    // Positions relative to viewport top-left
-                    startX = rect.left - viewportRect.left;
-                    startY = rect.top - viewportRect.top;
-                    initialMouseX = e.clientX;
-                    initialMouseY = e.clientY;
-
-                    // Prevent default drag behavior (like selecting text)
-                    e.preventDefault();
-                });
-
-                document.addEventListener('mousemove', (e) => {
-                    if (!isDragging || !element) return;
-
-                    // Calculate mouse movement
-                    const dx = e.clientX - initialMouseX;
-                    const dy = e.clientY - initialMouseY;
-
-                    // Calculate new position
-                    let newX = startX + dx;
-                    let newY = startY + dy;
-
-                    // Constrain within viewport bounds
-                    const vpRect = viewport.getBoundingClientRect();
-                    const elRect = element.getBoundingClientRect();
-                    newX = Math.max(0, Math.min(newX, vpRect.width - elRect.width));
-                    newY = Math.max(0, Math.min(newY, vpRect.height - elRect.height));
-
-                    element.style.left = `${newX}px`;
-                    element.style.top = `${newY}px`;
-                });
-
-                document.addEventListener('mouseup', () => {
-                    if (isDragging && element) {
-                        isDragging = false;
-                        element.style.cursor = 'grab';
-                        element.style.transition = ''; // Re-enable transition
-                        console.log(`${element.id} Dropped at:`, element.style.left, element.style.top);
-                    }
-                });
-                 // Prevent dragging the element itself (browser default)
-                 element.addEventListener('dragstart', (e) => {
-                    e.preventDefault();
-                });
-            }
-
-             // --- Reset Button ---
-            resetButton.addEventListener('click', initializeRects);
-
-             // --- Resize Logic ---
-            applySizeButton.addEventListener('click', () => {
-                const newWidth = parseInt(widthInput.value, 10);
-                const newHeight = parseInt(heightInput.value, 10);
-                // Use outer scope variables startRect and endRect
-
-                if (isNaN(newWidth) || isNaN(newHeight) || newWidth < 10 || newHeight < 10) {
-                    alert('Please enter valid width and height (minimum 10px).');
-                    return;
-                }
-
-                // Store previous positions to attempt recentering
-                const prevStartRect = startRect ? startRect.getBoundingClientRect() : null;
-                const prevEndRect = endRect ? endRect.getBoundingClientRect() : null;
-                const vpRect = viewport.getBoundingClientRect();
-
-                if (startRect) {
-                    startRect.style.width = `${newWidth}px`;
-                    startRect.style.height = `${newHeight}px`;
-                }
-                if (endRect) {
-                    endRect.style.width = `${newWidth}px`;
-                    endRect.style.height = `${newHeight}px`;
-                }
-
-                // Attempt to reposition to maintain center (best effort)
-                if (startRect && prevStartRect) {
-                     const prevCenterX = (prevStartRect.left - vpRect.left) + prevStartRect.width / 2;
-                     const prevCenterY = (prevStartRect.top - vpRect.top) + prevStartRect.height / 2;
-                     startRect.style.left = `${prevCenterX - newWidth / 2}px`;
-                     startRect.style.top = `${prevCenterY - newHeight / 2}px`;
-                }
-                 if (endRect && prevEndRect) {
-                     const prevCenterX = (prevEndRect.left - vpRect.left) + prevEndRect.width / 2;
-                     const prevCenterY = (prevEndRect.top - vpRect.top) + prevEndRect.height / 2;
-                     endRect.style.left = `${prevCenterX - newWidth / 2}px`;
-                     endRect.style.top = `${prevCenterY - newHeight / 2}px`;
-                 }
-
-                console.log(`Resized rectangles to ${newWidth}x${newHeight}`);
-                 // After resize, re-constrain positions just in case they went out of bounds
-                 [startRect, endRect].forEach(rect => {
-                     if (!rect) return;
-                     let currentX = parseFloat(rect.style.left);
-                     let currentY = parseFloat(rect.style.top);
-                     currentX = Math.max(0, Math.min(currentX, vpRect.width - newWidth));
-                     currentY = Math.max(0, Math.min(currentY, vpRect.height - newHeight));
-                     rect.style.left = `${currentX}px`;
-                     rect.style.top = `${currentY}px`;
-                 });
-
-            });
-
-            // --- Start Transition Button Logic ---
-            startButton.addEventListener('click', () => {
-                // Use outer scope variables startRect and endRect
-                if (!startRect || !endRect) return;
-
-                // Assign name/ID on first run if needed
-                if (!currentTransitionHasRun) {
-                    if (currentTransitionName === "New Transition") {
-                         currentTransitionId = Date.now();
-                         currentTransitionName = `Transition ${new Date(currentTransitionId).toLocaleString()}`;
-                    }
-                     // If it has a custom name but no ID, assign ID now
-                     else if (!currentTransitionId) {
-                          currentTransitionId = Date.now();
-                     }
-                    currentTransitionHasRun = true;
-                    updateCurrentNameDisplay();
-                }
-
-                // Change button text
-                 startButton.textContent = 'Run Again';
-
-                // Get Start/End Positions relative to viewport
-                const startRectBounds = startRect.getBoundingClientRect();
-                const endRectBounds = endRect.getBoundingClientRect();
-                const vpRect = viewport.getBoundingClientRect();
-
-                const startLeft = startRectBounds.left - vpRect.left;
-                const startTop = startRectBounds.top - vpRect.top;
-                const endLeft = endRectBounds.left - vpRect.left;
-                const endTop = endRectBounds.top - vpRect.top;
-
-                // Calculate Translation
-                const translateX = endLeft - startLeft;
-                const translateY = endTop - startTop;
-
-                // Get Duration
-                const duration = parseInt(durationInput.value, 10);
-                const durationSeconds = duration / 1000;
-
-                // --- Intermediate Points & Keyframes ---
-                 const controlPoints = [
-                    { x: startLeft, y: startTop }, // Start point
-                    ...intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Intermediate points (use raw coords)
-                    { x: endLeft, y: endTop } // End point
-                 ];
-
-                 // Generate a smooth path through the points
-                 const smoothPath = generateSplinePath(controlPoints);
-
-                 if (smoothPath.length > 1) { // Only need keyframes for paths with > 1 segment
-                     const keyframesName = `pathAnimation_${Date.now()}`;
-                     let keyframesRule = `@keyframes ${keyframesName} {\n`;
-                     const numPathPoints = smoothPath.length - 1;
-
-                     // Generate keyframes based on the smooth path
-                     smoothPath.forEach((point, index) => {
-                         const percentage = (index / numPathPoints) * 100;
-                         // Translate relative to the *initial* start position
-                         const pointTranslateX = point.x - startLeft;
-                         const pointTranslateY = point.y - startTop;
-                         // Interpolate rotation based on overall percentage
-                         const rotateXValue = xRotationDirection * 360 * (percentage / 100);
-                         const rotateYValue = yRotationDirection * 360 * (percentage / 100);
-                         const rotateZValue = zRotationDirection * 360 * (percentage / 100);
-
-                         const transformValue = `translateX(${pointTranslateX}px) translateY(${pointTranslateY}px) rotateX(${rotateXValue}deg) rotateY(${rotateYValue}deg) rotateZ(${rotateZValue}deg)`;
-                         keyframesRule += `  ${percentage}% { transform: ${transformValue}; }\n`;
-                     });
-
-                     keyframesRule += `}`;
-
-                     // Inject keyframes into a style tag
-                     const styleSheet = document.createElement("style");
-                     styleSheet.type = "text/css";
-                     styleSheet.innerText = keyframesRule;
-                     document.head.appendChild(styleSheet);
-                     console.log('Generated Keyframes:\n', keyframesRule);
-
-                     // Apply animation
-                     startRect.style.animation = `${keyframesName} ${durationSeconds}s ease-in-out forwards`; // Use forwards to keep end state
-
-                     // Clean up style tag and animation property after completion
-                     setTimeout(() => {
-                        if (startRect) { // Check if element still exists
-                             // Keep final position/transform by applying it directly before removing animation
-                             const finalTransform = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
-                             startRect.style.transform = finalTransform;
-                             startRect.style.animation = 'none'; // Remove animation property
-                             console.log('Animation finished, applied final transform');
-                        }
-                        styleSheet.remove();
-                        console.log('Cleaned up keyframes style tag');
-                    }, duration);
-
-                 } else {
-                     // Fallback to simple transition if no intermediate points
-                     console.warn("Only start/end points defined, using simple transition.");
-                     const transformValue = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
-                     startRect.style.transition = `transform ${durationSeconds}s ease-in-out`;
-                     startRect.style.transform = transformValue;
-                     // Reset after transition
-                     setTimeout(() => {
-                         if (startRect) {
-                              startRect.style.transition = 'none';
-                              startRect.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`; // Keep position, reset rotation
-                              console.log('Simple transition ended, transform partially reset.');
-                         }
-                     }, duration);
-                 }
-            });
-
-            // --- Replay Transition Button Logic ---
-            replayButton.addEventListener('click', () => {
-                 // Use outer scope variable startRect
-                if (!startRect) return;
-
-                // Instantly reset the green rectangle's transform and animation
-                const currentLeft = startRect.style.left;
-                const currentTop = startRect.style.top;
-                startRect.style.transition = 'none';
-                startRect.style.animation = 'none'; // Clear previous animation
-                startRect.style.left = currentLeft;
-                startRect.style.top = currentTop;
-                startRect.style.transform = ''; // Reset transform completely
-
-                // Delay slightly before starting the animation again
-                 requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                         startButton.click(); // Trigger the full animation logic
-                         console.log('Replaying transition (potentially with keyframes)...');
-                    });
-                });
-            });
-
-            // --- Rotation Direction Toggle Logic ---
-            const directionToggles = document.querySelectorAll('.direction-toggle');
-            directionToggles.forEach(toggle => {
-                const axis = toggle.dataset.axis;
-                const buttons = toggle.querySelectorAll('.btn-dir');
-                buttons.forEach(button => {
-                    button.addEventListener('click', () => {
-                        const newDirection = parseInt(button.dataset.value, 10);
-                        if (axis === 'x') xRotationDirection = newDirection;
-                        else if (axis === 'y') yRotationDirection = newDirection;
-                        else if (axis === 'z') zRotationDirection = newDirection;
-                        console.log(`Set ${axis}-axis direction to: ${newDirection}`);
-                        buttons.forEach(btn => btn.classList.remove('active'));
-                        button.classList.add('active');
-                    });
-                });
-            });
-
-             // --- Point Management Logic ---
-             // Uses viewport, addPointButton, removePointButton from outer scope
-            addPointButton.addEventListener('click', () => {
-                isAddingPoints = !isAddingPoints;
-                 if (isAddingPoints) {
-                     addPointButton.textContent = 'ADDING POINTS (Click Outside Viewport to Exit)';
-                     addPointButton.style.backgroundColor = '#28a745';
-                     viewport.style.cursor = 'crosshair';
-                     selectPoint(-1); // Deselect any selected point
-                     console.log('Entered Add Point mode.');
-                 } else {
-                     exitAddPointMode();
-                 }
-            });
-
-            viewport.addEventListener('click', (e) => {
-                if (!isAddingPoints || draggingPointIndex !== -1) return; // Don't add if dragging point
-                // Only add if clicking directly on viewport
-                if (e.target === viewport) {
-                     const vpRect = viewport.getBoundingClientRect();
-                     const x = e.clientX - vpRect.left;
-                     const y = e.clientY - vpRect.top;
-                     addIntermediatePoint(x, y);
-                     // Stay in adding mode
-                }
-            });
-
-             // Exit Add Mode by clicking outside viewport or pressing Esc
-             document.addEventListener('click', (e) => {
-                 if (isAddingPoints && !viewport.contains(e.target) && e.target !== addPointButton) {
-                     console.log('Clicked outside viewport.');
-                     exitAddPointMode();
-                 }
-             });
-             document.addEventListener('keydown', (e) => {
-                 if (isAddingPoints && e.key === 'Escape') {
-                     console.log('Escape pressed.');
-                     exitAddPointMode();
-                 }
-             });
-
-            function exitAddPointMode() {
-                 if (!isAddingPoints) return;
-                 isAddingPoints = false;
-                 addPointButton.textContent = 'Add Intermediate Point';
-                 addPointButton.style.backgroundColor = '';
-                 viewport.style.cursor = 'default';
-                 console.log('Exited Add Point mode.');
-            }
-
-            function addIntermediatePoint(x, y) {
-                const marker = document.createElement('div');
-                marker.className = 'point-marker';
-                marker.style.left = `${x}px`;
-                marker.style.top = `${y}px`;
-                viewport.appendChild(marker);
-                const pointData = { x, y, element: marker };
-                const pointIndex = intermediatePoints.length;
-                intermediatePoints.push(pointData);
-                console.log('Added point:', pointData);
-                marker.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent viewport click event
-                    selectPoint(pointIndex);
-                });
-
-                 // Make the new point draggable
-                 makePointDraggable(marker, pointIndex);
-            }
-
-            function selectPoint(index) {
-                if (selectedPointIndex !== -1 && intermediatePoints[selectedPointIndex]) {
-                    intermediatePoints[selectedPointIndex].element.classList.remove('selected');
-                }
-                if (selectedPointIndex === index) {
-                    selectedPointIndex = -1;
-                    removePointButton.disabled = true;
-                    console.log('Deselected point', index);
-                } else {
-                    selectedPointIndex = index;
-                     if (intermediatePoints[index]) { // Check point exists before accessing element
-                         intermediatePoints[index].element.classList.add('selected');
-                         removePointButton.disabled = false;
-                         console.log('Selected point', index);
-                     } else {
-                         console.error('Attempted to select non-existent point at index:', index);
-                         selectedPointIndex = -1; // Reset selection
-                         removePointButton.disabled = true;
-                     }
-                }
-            }
-
-            // Renamed from removePointButton listener logic
-            function removePointByIndex(indexToRemove) {
-                if (indexToRemove < 0 || indexToRemove >= intermediatePoints.length || !intermediatePoints[indexToRemove]) {
-                    console.warn('Invalid index for removePointByIndex:', indexToRemove);
-                    return;
-                }
-                console.log('Removing point', indexToRemove);
-                intermediatePoints[indexToRemove].element.remove();
-                intermediatePoints.splice(indexToRemove, 1);
-                const oldSelectedIndex = selectedPointIndex;
-
-                // Clear selection if the removed point was selected
-                if (selectedPointIndex === indexToRemove) {
-                     selectedPointIndex = -1;
-                     removePointButton.disabled = true;
-                 } else if (selectedPointIndex > indexToRemove) {
-                     // Adjust selected index if it came after the removed one
-                     selectedPointIndex--;
-                 }
-
-                // Adjust indices and reattach listeners for subsequent points
-                intermediatePoints.forEach((p, i) => {
-                     if (i >= indexToRemove) {
-                          const newMarker = p.element.cloneNode(true);
-                          p.element.parentNode.replaceChild(newMarker, p.element);
-                          p.element = newMarker;
-                          // Re-add select listener
-                          newMarker.addEventListener('click', (e) => {
-                              e.stopPropagation();
-                              selectPoint(i);
-                          });
-                          // Re-add drag listener
-                          makePointDraggable(newMarker, i);
-                           // Re-apply selected style if needed
-                           if (i === selectedPointIndex) {
-                               newMarker.classList.add('selected');
-                           }
-                      }
-                });
-            }
-
-            // Update the remove button listener to use the function
-             removePointButton.addEventListener('click', () => {
-                 if (selectedPointIndex !== -1) {
-                     removePointByIndex(selectedPointIndex);
-                 }
-             });
-
-            // --- Dragging Logic (Points) ---
-            function makePointDraggable(marker, index) {
-                 let isDraggingPoint = false;
-
-                 marker.addEventListener('mousedown', (e) => {
-                     // Prevent viewport click & rect drag
-                     e.stopPropagation();
-                     // Don't drag if in add mode
-                     if (isAddingPoints) return;
-
-                     isDraggingPoint = true;
-                     draggingPointIndex = index;
-                     marker.style.cursor = 'grabbing';
-                     marker.style.transition = 'none'; // Disable transition during drag
-                     marker.style.zIndex = '10'; // Bring to front
-                     document.body.style.cursor = 'grabbing'; // Optional: change body cursor
-
-                     const rect = marker.getBoundingClientRect();
-                     // Calculate offset from mouse click to marker top-left and store in outer scope
-                     dragOffsetX = e.clientX - rect.left;
-                     dragOffsetY = e.clientY - rect.top;
-
-                     // Select the point visually
-                     selectPoint(index);
-                 });
-
-                 // Mousemove and Mouseup are handled globally now
-            }
-
-             // --- Global Mouse Move for Dragging Points ---
-             document.addEventListener('mousemove', (e) => {
-                 if (draggingPointIndex === -1) return; // Not dragging a point
-
-                 const pointData = intermediatePoints[draggingPointIndex];
-                 if (!pointData) return;
-
-                 const marker = pointData.element;
-                 const vpRect = viewport.getBoundingClientRect();
-
-                 // Calculate new marker top-left position relative to viewport using outer scope offsets
-                 let newX = e.clientX - vpRect.left - dragOffsetX;
-                 let newY = e.clientY - vpRect.top - dragOffsetY;
-
-                 // Update visual position
-                 marker.style.left = `${newX}px`;
-                 marker.style.top = `${newY}px`;
-             });
-
-             // --- Global Mouse Up for Dragging Points ---
-             document.addEventListener('mouseup', (e) => {
-                 if (draggingPointIndex === -1) return; // Not dragging a point
-
-                 const pointData = intermediatePoints[draggingPointIndex];
-                 const marker = pointData.element;
-                 const vpRect = viewport.getBoundingClientRect();
-
-                 marker.style.cursor = 'pointer';
-                 marker.style.transition = '';
-                 marker.style.zIndex = '3';
-                 document.body.style.cursor = 'default';
-
-                 // Get final position relative to viewport
-                 const finalX = parseFloat(marker.style.left);
-                 const finalY = parseFloat(marker.style.top);
-                 const markerRadius = marker.offsetWidth / 2; // Approx radius
-
-                 // Check if center of marker is outside viewport bounds
-                 const isOutside = (
-                     finalX + markerRadius < 0 ||
-                     finalX + markerRadius > vpRect.width ||
-                     finalY + markerRadius < 0 ||
-                     finalY + markerRadius > vpRect.height
-                 );
-
-                 if (isOutside) {
-                     console.log(`Point ${draggingPointIndex} dragged outside - deleting.`);
-                     removePointByIndex(draggingPointIndex);
-                 } else {
-                     // Update the data array with the new constrained position
-                     pointData.x = finalX;
-                     pointData.y = finalY;
-                     console.log(`Point ${draggingPointIndex} moved to:`, pointData.x, pointData.y);
-                      // Optionally re-select after move, or clear selection
-                      // selectPoint(draggingPointIndex); // Keep selected
-                      selectPoint(-1); // Deselect after move
-                 }
-
-                 draggingPointIndex = -1; // Stop dragging
-             });
-
-            // --- Update Current Name Display & Edit UI ---
-            function updateCurrentNameDisplay() {
-                currentNameDisplay.textContent = currentTransitionName;
-                // Show edit button only if it's not the default "New Transition" name
-                editCurrentNameButton.style.display = (currentTransitionName !== "New Transition" && editCurrentNameInput.style.display === 'none') ? 'inline-block' : 'none';
-                // Hide input/save button for name editing
-                editCurrentNameInput.style.display = 'none';
-                saveCurrentNameButton.style.display = 'none';
-                currentNameDisplay.style.display = 'inline-block'; // Ensure name is shown
-            }
-
-            editCurrentNameButton.addEventListener('click', () => {
-                editCurrentNameInput.value = currentTransitionName;
-                currentNameDisplay.style.display = 'none';
-                editCurrentNameButton.style.display = 'none';
-                editCurrentNameInput.style.display = 'inline-block';
-                saveCurrentNameButton.style.display = 'inline-block';
-                editCurrentNameInput.focus();
-            });
-
-            saveCurrentNameButton.addEventListener('click', () => {
-                const newName = editCurrentNameInput.value.trim();
-                if (!newName) {
-                    alert('Please enter a valid name.');
-                    return;
-                }
-                currentTransitionName = newName;
-                console.log('Current transition name updated to:', currentTransitionName);
-
-                // If this transition already exists in storage (has an ID), update it now
-                if (currentTransitionId) {
-                     let transitions = getSavedTransitions();
-                     const index = transitions.findIndex(t => t.id === currentTransitionId);
-                     if (index !== -1) {
-                         transitions[index].name = currentTransitionName;
-                         saveTransitions(transitions);
-                         console.log('Updated name in localStorage for ID:', currentTransitionId);
-                         renderSavedList(); // Update list if a saved item was renamed
-                     } else {
-                         console.warn('Current transition had an ID but was not found in localStorage for rename?', currentTransitionId);
-                         // It might have been deleted, clear the ID
-                         // currentTransitionId = null;
-                     }
-                 }
-                updateCurrentNameDisplay(); // Update display and hide input
-            });
-             // Also save name on Enter key in input
-            editCurrentNameInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    saveCurrentNameButton.click();
-                } else if (e.key === 'Escape') {
-                    // Cancel editing
-                    updateCurrentNameDisplay();
-                }
-            });
-
-            // --- Save Button Logic (for Current Configuration) ---
-            saveButton.addEventListener('click', () => {
-                if (!startRect || !endRect) {
-                    alert('Cannot save, rectangles not initialized.');
-                    return;
-                }
-
-                 // Assign name/ID if it's still "New Transition" and hasn't run
-                 if (currentTransitionName === "New Transition" && !currentTransitionHasRun) {
-                     currentTransitionId = Date.now();
-                     currentTransitionName = `Transition ${new Date(currentTransitionId).toLocaleString()}`;
-                     console.log('Assigning default name/ID before saving:', currentTransitionName, currentTransitionId);
-                     updateCurrentNameDisplay(); // Show the assigned name
-                 } else if (!currentTransitionId) {
-                     // Has a custom name but no ID yet (wasn't run/loaded)
-                     currentTransitionId = Date.now();
-                     console.log('Assigning new ID before saving custom name:', currentTransitionId);
-                 }
-
-                const transitionToSave = {
-                    id: currentTransitionId,
-                    name: currentTransitionName,
-                    duration: parseInt(durationInput.value, 10),
-                    rectWidth: parseInt(widthInput.value, 10),
-                    rectHeight: parseInt(heightInput.value, 10),
-                    startX: startRect.style.left,
-                    startY: startRect.style.top,
-                    endX: endRect.style.left,
-                    endY: endRect.style.top,
-                    points: intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Save only coords
-                    rotX: xRotationDirection,
-                    rotY: yRotationDirection,
-                    rotZ: zRotationDirection
-                };
-
-                let transitions = getSavedTransitions();
-                const existingIndex = transitions.findIndex(t => t.id === transitionToSave.id);
-
-                if (existingIndex !== -1) {
-                    // Update existing transition
-                    transitions[existingIndex] = transitionToSave;
-                    console.log('Updated existing transition in localStorage:', transitionToSave);
-                } else {
-                    // Add as new transition
-                    transitions.push(transitionToSave);
-                    console.log('Saved new transition:', transitionToSave);
-                }
-                saveTransitions(transitions);
-
-                // saveNameInput.value = ''; // Input removed
-                renderSavedList(); // Refresh the list
-                 // Provide visual feedback (optional)
-                 currentNameDisplay.style.transition = 'color 0.1s ease-in-out';
-                 currentNameDisplay.style.color = '#28a745'; // Green flash
-                 setTimeout(() => { currentNameDisplay.style.color = ''; }, 500);
-            });
-
-            // --- Rename Saved Transition ---
-            renameButton.addEventListener('click', () => {
-                if (!selectedSavedTransitionId) return;
-                const newName = renameInput.value.trim();
-                if (!newName) {
-                    alert('Please enter a valid name.');
-                    return;
-                }
-
-                let transitions = getSavedTransitions();
-                const index = transitions.findIndex(t => t.id === selectedSavedTransitionId);
-                if (index !== -1) {
-                    transitions[index].name = newName;
-                    saveTransitions(transitions);
-                    console.log('Renamed transition', selectedSavedTransitionId, 'to', newName);
-                    renderSavedList(); // Re-render to show new name and clear selection
-                } else {
-                    console.error('Could not find transition to rename:', selectedSavedTransitionId);
-                }
-            });
-
-            // --- Delete Saved Transition ---
-            deleteButton.addEventListener('click', () => {
-                if (!selectedSavedTransitionId) return;
-                if (!confirm('Are you sure you want to delete this saved transition?')) {
-                    return;
-                }
-
-                let transitions = getSavedTransitions();
-                transitions = transitions.filter(t => t.id !== selectedSavedTransitionId);
-                saveTransitions(transitions);
-                console.log('Deleted transition', selectedSavedTransitionId);
-                renderSavedList(); // Re-render list and clear selection
-            });
-
-            // --- Replay Saved Transition ---
-            replaySavedButton.addEventListener('click', () => {
-                if (!selectedSavedTransitionId) return;
-
-                const transitions = getSavedTransitions();
-                const savedState = transitions.find(t => t.id === selectedSavedTransitionId);
-                if (!savedState) {
-                    alert('Error: Could not find saved transition data.');
-                    return;
-                }
-
-                console.log('Loading and replaying saved state:', savedState.id);
-
-                // 0. Update Current Transition State
-                currentTransitionName = savedState.name;
-                currentTransitionId = savedState.id;
-                currentTransitionHasRun = true; // Mark as run since it's loaded
-                updateCurrentNameDisplay();
-                startButton.textContent = 'Replay Loaded'; // Update main button text
-
-                // 1. Restore State
-                // Clear current intermediate points visually and from array
-                 intermediatePoints.forEach(p => p.element.remove());
-                 intermediatePoints = [];
-                 selectedPointIndex = -1;
-                 removePointButton.disabled = true;
-
-                 // Set Rect sizes
-                 widthInput.value = savedState.rectWidth;
-                 heightInput.value = savedState.rectHeight;
-                 applySizeButton.click(); // Trigger resize logic (includes recentering)
-
-                 // Set Rect positions (ensure they exist first)
-                 if (startRect) {
-                     startRect.style.left = savedState.startX;
-                     startRect.style.top = savedState.startY;
-                     startRect.style.transform = ''; // Reset transform before replay
-                     startRect.style.animation = 'none'; // Reset animation
-                 }
-                 if (endRect) {
-                     endRect.style.left = savedState.endX;
-                     endRect.style.top = savedState.endY;
-                 }
-
-                 // Recreate intermediate points
-                 savedState.points.forEach(p => addIntermediatePoint(p.x, p.y));
-
-                 // Set duration
-                 durationInput.value = savedState.duration;
-
-                 // Set rotation directions (update state vars and button UI)
-                 xRotationDirection = savedState.rotX;
-                 yRotationDirection = savedState.rotY;
-                 zRotationDirection = savedState.rotZ;
-                 document.querySelectorAll('.direction-toggle').forEach(toggle => {
-                     const axis = toggle.dataset.axis;
-                     let currentDir;
-                     if (axis === 'x') currentDir = xRotationDirection;
-                     else if (axis === 'y') currentDir = yRotationDirection;
-                     else if (axis === 'z') currentDir = zRotationDirection;
-                     toggle.querySelectorAll('.btn-dir').forEach(btn => {
-                         btn.classList.toggle('active', parseInt(btn.dataset.value) === currentDir);
-                     });
-                 });
-
-                // 2. Trigger Replay
-                // Use a slight delay to ensure DOM updates from state restoration are processed
-                setTimeout(() => {
-                    replayButton.click(); // Click the main replay button
-                }, 50); // 50ms delay
-            });
-
-            // --- Initial Call ---
-            initializeRects();
-            renderSavedList(); // Load and display saved list on startup
-            updateCurrentNameDisplay(); // Ensure initial name display is correct
-
         });
-    </script>
-
-</body>
-</html> 
+    </script> 
