@@ -559,18 +559,17 @@
             <div class="control-section">
                 <label for="rectangle">Rectangle:</label>
                 <div class="control-group block-size-controls">
-                    <input type="number" id="rectWidth" value="100" min="10" max="999" title="Width">
-                    <input type="number" id="rectHeight" value="60" min="10" max="999" title="Height">
-                    <button id="applySize">Apply</button>
+                    <input type="number" id="rectWidth" value="100" min="50" max="400" title="Width (50-400px)">
+                    <input type="number" id="rectHeight" value="60" min="50" max="400" title="Height (50-400px)">
                 </div>
             </div>
 
             <div class="control-section">
                 <label for="waypoints">Waypoints:</label>
                 <div class="control-group waypoint-controls">
-                    <button id="addWaypointBtn" class="waypoint-btn">Add</button>
+                    <button id="addWaypointBtn" class="waypoint-btn">Add +</button>
                     <span id="waypointCounter">0</span>
-                    <button id="deleteLastWaypointBtn" class="danger waypoint-btn" disabled>Del</button>
+                    <button id="deleteLastWaypointBtn" class="danger waypoint-btn" disabled>- Del</button>
                 </div>
             </div>
         </div>
@@ -605,6 +604,7 @@
             const saveCurrentNameButton = document.getElementById('saveCurrentNameBtn');
             const saveButton = document.getElementById('saveTransition'); // Main save button
             const themeToggleButton = document.getElementById('themeToggle');
+            console.log("Initial check - themeToggleButton element:", themeToggleButton); // Check element selection
 
             // NOTE: startRect and endRect are created dynamically, so use 'let'
             let startRect = null;
@@ -614,10 +614,11 @@
             let xRotationDirection = 1;
             let yRotationDirection = 1;
             let zRotationDirection = 1;
-            let isAddingPoints = false; // State flag for adding points mode
+            let isAddingPoints = true; // Always in WAM mode
             let intermediatePoints = []; // Array to store {x, y, element} of intermediate points
             let selectedPointIndex = -1; // Index of the selected intermediate point
             let draggingPointIndex = -1; // Index of the point being dragged
+            let lastModifiedPointIndex = -1; // Track most recently modified point
             let dragOffsetX = 0;
             let dragOffsetY = 0;
             let selectedSavedTransitionId = null;
@@ -647,10 +648,25 @@
                 const count = intermediatePoints.length;
                 waypointCounter.textContent = count;
                 const isDisabled = count === 0;
-                console.log(`UpdateCounter: Count=${count}, isDisabled=${isDisabled}, Button Element:`, deleteLastWaypointButton); // Log before setting
+                
+                // Update the Delete button state
                 deleteLastWaypointButton.disabled = isDisabled;
-                console.log(`UpdateCounter: AFTER setting, deleteLastWaypointButton.disabled =`, deleteLastWaypointButton.disabled); // Log after setting
+                
+                // Handle pointer events to prevent any mouse interaction when disabled
+                if (isDisabled) {
+                    deleteLastWaypointButton.style.pointerEvents = 'none';
+                    deleteLastWaypointButton.style.opacity = '0.5';
+                    deleteLastWaypointButton.style.cursor = 'not-allowed';
+                } else {
+                    deleteLastWaypointButton.style.pointerEvents = 'auto';
+                    deleteLastWaypointButton.style.opacity = '1';
+                    deleteLastWaypointButton.style.cursor = 'pointer';
+                }
+                
+                // Cap the maximum number of waypoints
                 addWaypointButton.disabled = count >= 99;
+                
+                console.log(`Waypoint counter updated: ${count} points`);
             }
 
             // --- Theming --- //
@@ -890,150 +906,576 @@
             resetButton.addEventListener('click', initializeRects);
 
              // --- Resize Logic ---
-            applySizeButton.addEventListener('click', () => {
+            function applyRectangleSize() {
                 const newWidth = parseInt(widthInput.value, 10);
                 const newHeight = parseInt(heightInput.value, 10);
-                // Use outer scope variables startRect and endRect
 
-                if (isNaN(newWidth) || isNaN(newHeight) || newWidth < 10 || newHeight < 10) {
-                    alert('Please enter valid rectangle width and height (minimum 10px).');
+                // Enforce limits: 50px minimum, 400px maximum
+                const validWidth = Math.max(50, Math.min(400, newWidth));
+                const validHeight = Math.max(50, Math.min(400, newHeight));
+                
+                // Update input values if they were clamped
+                if (validWidth !== newWidth) {
+                    widthInput.value = validWidth;
+                }
+                if (validHeight !== newHeight) {
+                    heightInput.value = validHeight;
+                }
+
+                if (isNaN(validWidth) || isNaN(validHeight)) {
+                    console.warn('Invalid rectangle dimensions');
                     return;
                 }
 
-                // Store previous positions to attempt recentering
-                const prevStartRect = startRect ? startRect.getBoundingClientRect() : null;
-                const prevEndRect = endRect ? endRect.getBoundingClientRect() : null;
-                 // Viewport size is fixed, so we don't need its rect here for resizing logic
-                 // const vpRect = viewport.getBoundingClientRect();
-
-                if (startRect) {
-                    startRect.style.width = `${newWidth}px`;
-                    startRect.style.height = `${newHeight}px`;
-                }
-                if (endRect) {
-                    endRect.style.width = `${newWidth}px`;
-                    endRect.style.height = `${newHeight}px`;
-                }
-
-                // Attempt to reposition to maintain center (best effort)
-                if (startRect && prevStartRect) {
-                     const prevCenterX = (prevStartRect.left - vpRect.left) + prevStartRect.width / 2;
-                     const prevCenterY = (prevStartRect.top - vpRect.top) + prevStartRect.height / 2;
-                     startRect.style.left = `${prevCenterX - newWidth / 2}px`;
-                     startRect.style.top = `${prevCenterY - newHeight / 2}px`;
-                }
-                 if (endRect && prevEndRect) {
-                     const prevCenterX = (prevEndRect.left - vpRect.left) + prevEndRect.width / 2;
-                     const prevCenterY = (prevEndRect.top - vpRect.top) + prevEndRect.height / 2;
-                     endRect.style.left = `${prevCenterX - newWidth / 2}px`;
-                     endRect.style.top = `${prevCenterY - newHeight / 2}px`;
-                 }
-
-                console.log(`Resized rectangles to ${newWidth}x${newHeight}`);
-                 // After resize, re-constrain rectangle positions just in case they went out of bounds
-                 // Get viewport bounds *once* for constraining
-                 const vpRect = viewport.getBoundingClientRect();
-                 [startRect, endRect].forEach(rect => {
-                     if (!rect) return;
-                     let currentX = parseFloat(rect.style.left);
-                     let currentY = parseFloat(rect.style.top);
-                     currentX = Math.max(0, Math.min(currentX, vpRect.width - newWidth));
-                     currentY = Math.max(0, Math.min(currentY, vpRect.height - newHeight));
-                     rect.style.left = `${currentX}px`;
-                     rect.style.top = `${currentY}px`;
-                 });
-
-            });
-
-            // --- Start Transition Button Logic ---
-            startButton.addEventListener('click', () => {
-                // Use outer scope variables startRect and endRect
-                if (!startRect || !endRect) return;
-
-                // Assign name/ID on first run if needed
-                if (!currentTransitionHasRun) {
-                    if (currentTransitionName === "New Transition") {
-                         currentTransitionId = Date.now();
-                         currentTransitionName = `Transition ${new Date(currentTransitionId).toLocaleString()}`;
-                    }
-                     // If it has a custom name but no ID, assign ID now
-                     else if (!currentTransitionId) {
-                          currentTransitionId = Date.now();
-                     }
-                    currentTransitionHasRun = true;
-                }
-
-                // Change button text
-                 startButton.textContent = 'Run Again';
-
-                // Get Start/End Positions relative to viewport
-                const startRectBounds = startRect.getBoundingClientRect();
-                const endRectBounds = endRect.getBoundingClientRect();
+                // Get viewport bounds for validation
                 const vpRect = viewport.getBoundingClientRect();
 
-                const startLeft = startRectBounds.left - vpRect.left;
-                const startTop = startRectBounds.top - vpRect.top;
-                const endLeft = endRectBounds.left - vpRect.left;
-                const endTop = endRectBounds.top - vpRect.top;
+                // Resize both rectangles while maintaining their current centers
+                [startRect, endRect].forEach(rect => {
+                    if (!rect) return;
+                    
+                    // Get current position and size
+                    const currentLeft = parseFloat(rect.style.left) || 0;
+                    const currentTop = parseFloat(rect.style.top) || 0;
+                    const currentWidth = rect.offsetWidth;
+                    const currentHeight = rect.offsetHeight;
+                    
+                    // Calculate current center point
+                    const centerX = currentLeft + (currentWidth / 2);
+                    const centerY = currentTop + (currentHeight / 2);
+                    
+                    // Apply new size
+                    rect.style.width = `${validWidth}px`;
+                    rect.style.height = `${validHeight}px`;
+                    
+                    // Reposition to maintain the same center
+                    const newLeft = centerX - (validWidth / 2);
+                    const newTop = centerY - (validHeight / 2);
+                    
+                    // Keep within viewport bounds
+                    const boundedLeft = Math.max(0, Math.min(newLeft, vpRect.width - validWidth));
+                    const boundedTop = Math.max(0, Math.min(newTop, vpRect.height - validHeight));
+                    
+                    rect.style.left = `${boundedLeft}px`;
+                    rect.style.top = `${boundedTop}px`;
+                });
 
-                // Calculate Translation
-                const translateX = endLeft - startLeft;
-                const translateY = endTop - startTop;
+                console.log(`Resized rectangles to ${validWidth}x${validHeight} while maintaining centers`);
+            }
 
-                // Get Duration
-                const duration = parseInt(durationInput.value, 10);
-                const durationSeconds = duration / 1000;
-
-                // --- Intermediate Points & Keyframes ---
-                 const controlPoints = [
-                    { x: startLeft, y: startTop }, // Start point
-                    ...intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Intermediate points (use raw coords)
-                    { x: endLeft, y: endTop } // End point
-                 ];
-
-                 // Generate a smooth path through the points
-                 const smoothPath = generateSplinePath(controlPoints);
-
-                 if (smoothPath.length > 1) { // Only need keyframes for paths with > 1 segment
-                     const keyframesName = `pathAnimation_${Date.now()}`;
-                     let keyframesRule = `@keyframes ${keyframesName} {\n`;
-                     const numPathPoints = smoothPath.length - 1;
-
-                     // Generate keyframes based on the smooth path
-                     smoothPath.forEach((point, index) => {
-                         const percentage = (index / numPathPoints) * 100;
-                         // Translate relative to the *initial* start position
-                         const pointTranslateX = point.x - startLeft;
-                         const pointTranslateY = point.y - startTop;
-                         // Interpolate rotation based on overall percentage
-                         const rotateXValue = xRotationDirection * 360 * (percentage / 100);
-                         const rotateYValue = yRotationDirection * 360 * (percentage / 100);
-                         const rotateZValue = zRotationDirection * 360 * (percentage / 100);
-
-                         const transformValue = `translateX(${pointTranslateX}px) translateY(${pointTranslateY}px) rotateX(${rotateXValue}deg) rotateY(${rotateYValue}deg) rotateZ(${rotateZValue}deg)`;
-                         keyframesRule += `  ${percentage}% { transform: ${transformValue}; }\n`;
-                     });
-
-                     keyframesRule += `}`;
-
-                     // Inject keyframes into a style tag
-                     const styleSheet = document.createElement("style");
-                     styleSheet.textContent = `@keyframes ${keyframesName} {\n${keyframesRule}\n}`;
-                     document.head.appendChild(styleSheet);
-                 }
-            });
+            // Add event listeners for interactive updates
+            widthInput.addEventListener('change', applyRectangleSize);
+            heightInput.addEventListener('change', applyRectangleSize);
+            // Input event for real-time updates as user types or uses spinner
+            widthInput.addEventListener('input', applyRectangleSize);
+            heightInput.addEventListener('input', applyRectangleSize);
 
             // Load saved theme on startup - Add this line back
             const savedTheme = localStorage.getItem('transformTesterTheme') || 'light';
+
+            // --- Set up rotation button event handlers --- //
+            function setupRotationControls() {
+                // Select all rotation button groups
+                const directionToggles = document.querySelectorAll('.direction-toggle');
+                
+                directionToggles.forEach(toggle => {
+                    const axis = toggle.getAttribute('data-axis');
+                    const buttons = toggle.querySelectorAll('.btn-dir');
+                    
+                    buttons.forEach(button => {
+                        button.addEventListener('click', () => {
+                            // Remove active class from all buttons in this toggle
+                            buttons.forEach(b => b.classList.remove('active'));
+                            
+                            // Add active class to clicked button
+                            button.classList.add('active');
+                            
+                            // Get the value from the button's data attribute
+                            const value = parseInt(button.getAttribute('data-value'), 10);
+                            
+                            // Update the corresponding rotation direction variable
+                            if (axis === 'x') {
+                                xRotationDirection = value;
+                                console.log(`X rotation direction set to: ${value}`);
+                            } else if (axis === 'y') {
+                                yRotationDirection = value;
+                                console.log(`Y rotation direction set to: ${value}`);
+                            } else if (axis === 'z') {
+                                zRotationDirection = value;
+                                console.log(`Z rotation direction set to: ${value}`);
+                            }
+                            
+                            // Update the data-direction attribute on the parent toggle
+                            toggle.setAttribute('data-direction', value);
+                        });
+                    });
+                });
+                
+                console.log("Rotation control event handlers set up");
+            }
+
+            // --- Duration Control Setup --- //
+            function setupDurationControl() {
+                // Set constraints for animation duration
+                const MIN_DURATION = 100; // ms
+                const MAX_DURATION = 5000; // ms
+                const DEFAULT_DURATION = 500; // ms
+                
+                // Update input attributes to match constraints
+                durationInput.min = MIN_DURATION;
+                durationInput.max = MAX_DURATION;
+                durationInput.step = 50;
+                
+                // Ensure initial value is within range
+                const initialValue = parseInt(durationInput.value, 10);
+                if (isNaN(initialValue) || initialValue < MIN_DURATION || initialValue > MAX_DURATION) {
+                    durationInput.value = DEFAULT_DURATION;
+                }
+                
+                // Create and add duration feedback element
+                const durationFeedback = document.createElement('span');
+                durationFeedback.id = 'durationFeedback';
+                durationFeedback.style.marginLeft = '8px';
+                durationFeedback.style.fontSize = '0.9em';
+                durationFeedback.style.color = 'var(--text-color-secondary)';
+                durationInput.parentNode.appendChild(durationFeedback);
+                
+                // Update feedback text
+                function updateDurationFeedback() {
+                    const value = parseInt(durationInput.value, 10);
+                    if (!isNaN(value)) {
+                        const seconds = (value / 1000).toFixed(1);
+                        durationFeedback.textContent = `(${seconds}s)`;
+                        durationFeedback.style.color = 'var(--text-color-secondary)';
+                    } else {
+                        durationFeedback.textContent = '(invalid)';
+                        durationFeedback.style.color = '#dc3545'; // Error color
+                    }
+                }
+                
+                // Validate and correct input
+                function validateDuration() {
+                    let value = parseInt(durationInput.value, 10);
+                    
+                    if (isNaN(value)) {
+                        value = DEFAULT_DURATION;
+                    } else {
+                        // Clamp value to min/max range
+                        value = Math.max(MIN_DURATION, Math.min(MAX_DURATION, value));
+                    }
+                    
+                    // Update input if value changed
+                    if (value !== parseInt(durationInput.value, 10)) {
+                        durationInput.value = value;
+                    }
+                    
+                    updateDurationFeedback();
+                    return value;
+                }
+                
+                // Event listeners
+                durationInput.addEventListener('change', validateDuration);
+                durationInput.addEventListener('input', updateDurationFeedback);
+                
+                // Initial feedback update
+                updateDurationFeedback();
+                
+                console.log("Duration control set up with range:", MIN_DURATION, "-", MAX_DURATION, "ms");
+            }
+
+            // --- Viewport Action Buttons Setup --- //
+            function setupViewportActions() {
+                // Extract animation logic into a reusable function
+                function animateTransition(isReplay = false) {
+                    console.log(`${isReplay ? "Replaying" : "Starting"} transition...`);
+                    
+                    // Validate rectangle elements
+                    if (!startRect || !endRect) {
+                        console.error("Start/End rectangle elements not found!");
+                        return;
+                    }
+                    
+                    // Assign name/ID on first run if needed
+                    if (!currentTransitionHasRun && !isReplay) {
+                        if (currentTransitionName === "New Transition") {
+                            currentTransitionId = Date.now();
+                            currentTransitionName = `Transition ${new Date(currentTransitionId).toLocaleString()}`;
+                        }
+                        // If it has a custom name but no ID, assign ID now
+                        else if (!currentTransitionId) {
+                            currentTransitionId = Date.now();
+                        }
+                        currentTransitionHasRun = true;
+                    }
+                    
+                    // Update button text
+                    startButton.textContent = 'Run Again';
+                    
+                    // Get validated duration
+                    const duration = parseInt(durationInput.value, 10);
+                    const durationSeconds = Math.max(0.1, duration / 1000); // Ensure minimum duration
+                    
+                    // Get Start/End Positions relative to viewport
+                    const startRectBounds = startRect.getBoundingClientRect();
+                    const endRectBounds = endRect.getBoundingClientRect();
+                    const vpRect = viewport.getBoundingClientRect();
+                    
+                    const startLeft = startRectBounds.left - vpRect.left;
+                    const startTop = startRectBounds.top - vpRect.top;
+                    const endLeft = endRectBounds.left - vpRect.left;
+                    const endTop = endRectBounds.top - vpRect.top;
+                    
+                    // Calculate Translation
+                    const translateX = endLeft - startLeft;
+                    const translateY = endTop - startTop;
+                    
+                    // --- Intermediate Points & Keyframes ---
+                    const controlPoints = [
+                        { x: startLeft, y: startTop }, // Start point
+                        ...intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Intermediate points
+                        { x: endLeft, y: endTop } // End point
+                    ];
+                    
+                    // Generate a smooth path through the points
+                    const smoothPath = generateSplinePath(controlPoints);
+                    
+                    // Create keyframe animation for complex paths
+                    if (smoothPath.length > 1) {
+                        const keyframesName = `pathAnimation_${Date.now()}`;
+                        let keyframesRule = `@keyframes ${keyframesName} {\n`;
+                        const numPathPoints = smoothPath.length - 1;
+                        
+                        // Generate keyframes based on the smooth path
+                        smoothPath.forEach((point, index) => {
+                            const percentage = (index / numPathPoints) * 100;
+                            // Translate relative to the *initial* start position
+                            const pointTranslateX = point.x - startLeft;
+                            const pointTranslateY = point.y - startTop;
+                            // Interpolate rotation based on overall percentage
+                            const rotateXValue = xRotationDirection * 360 * (percentage / 100);
+                            const rotateYValue = yRotationDirection * 360 * (percentage / 100);
+                            const rotateZValue = zRotationDirection * 360 * (percentage / 100);
+                            
+                            const transformValue = `translateX(${pointTranslateX}px) translateY(${pointTranslateY}px) rotateX(${rotateXValue}deg) rotateY(${rotateYValue}deg) rotateZ(${rotateZValue}deg)`;
+                            keyframesRule += `  ${percentage}% { transform: ${transformValue}; }\n`;
+                        });
+                        
+                        keyframesRule += `}`;
+                        
+                        // Inject keyframes into a style tag
+                        const styleSheet = document.createElement("style");
+                        styleSheet.textContent = keyframesRule;
+                        document.head.appendChild(styleSheet);
+                        
+                        // Apply animation
+                        startRect.style.animation = `${keyframesName} ${durationSeconds}s ease-in-out forwards`; // Keep end state
+                        
+                        // Clean up style tag and animation property after completion
+                        setTimeout(() => {
+                            startRect.style.animation = '';
+                            startRect.style.transform = '';
+                            styleSheet.remove(); // Remove the style element when done
+                        }, duration + 100); // Add small buffer for animation completion
+                    } else {
+                        // Fallback to simple transition if no intermediate points
+                        const transformValue = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
+                        startRect.style.transition = `transform ${durationSeconds}s ease-in-out`;
+                        startRect.style.transform = transformValue;
+                        
+                        // Reset after transition
+                        setTimeout(() => {
+                            startRect.style.transform = '';
+                            startRect.style.transition = '';
+                        }, duration + 100);
+                    }
+                }
+                
+                // --- Start Button Event Handler ---
+                startButton.addEventListener('click', () => {
+                    animateTransition(false);
+                });
+                
+                // --- Replay Button Event Handler ---
+                replayButton.addEventListener('click', () => {
+                    // Reset rectangle position before replay
+                    startRect.style.animation = '';
+                    startRect.style.transform = '';
+                    
+                    // Small delay before starting animation to ensure reset took effect
+                    setTimeout(() => {
+                        animateTransition(true);
+                    }, 50);
+                });
+                
+                // --- Reset Button Event Handler ---
+                resetButton.addEventListener('click', () => {
+                    // Clear any ongoing animations
+                    if (startRect) {
+                        startRect.style.animation = '';
+                        startRect.style.transform = '';
+                        startRect.style.transition = '';
+                    }
+                    
+                    // Reinitialize rectangles
+                    initializeRects();
+                    
+                    console.log("Viewport reset complete");
+                });
+                
+                console.log("Viewport action buttons set up");
+            }
+
+            // --- Waypoint Controls Setup --- //
+            function setupWaypointControls() {
+                // Style Add button for permanent WAM mode
+                function styleAddButton() {
+                    addWaypointButton.textContent = 'Add +';
+                    addWaypointButton.style.backgroundColor = '#007bff'; // Standard button blue
+                    addWaypointButton.style.borderColor = '#0056b3'; // Darker blue border
+                    viewport.style.cursor = 'crosshair'; // Always show crosshair in viewport
+                }
+                
+                // Function to add a waypoint when clicked in the viewport
+                function addWaypoint(clientX, clientY) {
+                    const vpRect = viewport.getBoundingClientRect();
+                    const x = clientX - vpRect.left;
+                    const y = clientY - vpRect.top;
+                    
+                    // Create a visual marker for the waypoint
+                    const marker = document.createElement('div');
+                    marker.className = 'point-marker';
+                    marker.style.left = `${x}px`;
+                    marker.style.top = `${y}px`;
+                    viewport.appendChild(marker);
+                    
+                    // Store waypoint data
+                    const pointData = { x, y, element: marker };
+                    intermediatePoints.push(pointData);
+                    
+                    // Set as the last modified point
+                    lastModifiedPointIndex = intermediatePoints.length - 1;
+                    
+                    // Make marker draggable and selectable
+                    makeDraggableWaypoint(marker, intermediatePoints.length - 1);
+                    
+                    // Update counter and Del button state
+                    updateWaypointCounter();
+                    
+                    console.log(`Added waypoint at (${x}, ${y})`);
+                    return pointData;
+                }
+                
+                // Function to delete the most recently modified waypoint
+                function deleteLastWaypoint() {
+                    if (intermediatePoints.length === 0) return;
+                    
+                    // Determine which point to delete
+                    const indexToDelete = (lastModifiedPointIndex >= 0 && lastModifiedPointIndex < intermediatePoints.length) 
+                        ? lastModifiedPointIndex 
+                        : intermediatePoints.length - 1; // Fallback to last point
+                    
+                    // Get the point to delete
+                    const pointToDelete = intermediatePoints[indexToDelete];
+                    
+                    // Remove the point from the array using splice
+                    intermediatePoints.splice(indexToDelete, 1);
+                    
+                    // Remove the visual marker
+                    if (pointToDelete.element) {
+                        pointToDelete.element.remove();
+                    }
+                    
+                    // Update indexes after deletion
+                    if (lastModifiedPointIndex >= intermediatePoints.length) {
+                        lastModifiedPointIndex = intermediatePoints.length - 1;
+                    }
+                    
+                    // Update the counter and Del button state
+                    updateWaypointCounter();
+                    
+                    console.log(`Deleted waypoint at index ${indexToDelete}`);
+                }
+                
+                // Make waypoint draggable
+                function makeDraggableWaypoint(element, index) {
+                    let isDragging = false;
+                    
+                    element.addEventListener('mousedown', (e) => {
+                        // Remove this check to allow dragging in WAM mode
+                        // if (isAddingPoints) return;
+                        
+                        isDragging = true;
+                        draggingPointIndex = index;
+                        lastModifiedPointIndex = index; // Update last modified point
+                        wasDraggingPoint = false;
+                        
+                        // Get initial positions for drag calculation
+                        const vpRect = viewport.getBoundingClientRect();
+                        dragOffsetX = e.clientX - (vpRect.left + intermediatePoints[index].x);
+                        dragOffsetY = e.clientY - (vpRect.top + intermediatePoints[index].y);
+                        
+                        // Select this point and deselect others
+                        intermediatePoints.forEach((p, i) => {
+                            if (p.element) {
+                                if (i === index) {
+                                    p.element.classList.add('selected');
+                                } else {
+                                    p.element.classList.remove('selected');
+                                }
+                            }
+                        });
+                        
+                        selectedPointIndex = index;
+                        e.stopPropagation(); // Prevent viewport click
+                        e.preventDefault();
+                    });
+                    
+                    // Handle point movement in global mouse handlers
+                }
+                
+                // Event: Viewport click to add waypoint
+                viewport.addEventListener('click', (e) => {
+                    // Don't add waypoint if we just finished dragging
+                    if (wasDraggingPoint) {
+                        wasDraggingPoint = false;
+                        return;
+                    }
+                    
+                    // Also don't add waypoint if clicked on an existing waypoint
+                    if (e.target.classList.contains('point-marker')) {
+                        return;
+                    }
+                    
+                    addWaypoint(e.clientX, e.clientY);
+                });
+                
+                // Event: Add button click
+                addWaypointButton.addEventListener('click', () => {
+                    // Simply display a message in the console - button now only serves as a label
+                    console.log('Add button clicked - you can click anywhere in the viewport to add waypoints');
+                });
+                
+                // Event: Delete last waypoint button
+                deleteLastWaypointButton.addEventListener('click', () => {
+                    deleteLastWaypoint();
+                });
+                
+                // Apply WAM styling
+                styleAddButton();
+                
+                // Global mouse move for dragging waypoints
+                document.addEventListener('mousemove', (e) => {
+                    if (draggingPointIndex >= 0 && draggingPointIndex < intermediatePoints.length) {
+                        wasDraggingPoint = true; // Set flag to prevent click after drag
+                        
+                        const vpRect = viewport.getBoundingClientRect();
+                        const newX = e.clientX - vpRect.left - dragOffsetX;
+                        const newY = e.clientY - vpRect.top - dragOffsetY;
+                        
+                        // Remove constraints - allow dragging outside viewport
+                        // const constrainedX = Math.max(0, Math.min(newX, vpRect.width));
+                        // const constrainedY = Math.max(0, Math.min(newY, vpRect.height));
+                        
+                        // Update point position
+                        intermediatePoints[draggingPointIndex].x = newX;
+                        intermediatePoints[draggingPointIndex].y = newY;
+                        
+                        // Update visual marker
+                        const marker = intermediatePoints[draggingPointIndex].element;
+                        if (marker) {
+                            marker.style.left = `${newX}px`;
+                            marker.style.top = `${newY}px`;
+                        }
+                    }
+                });
+                
+                // Global mouse up to end waypoint dragging
+                document.addEventListener('mouseup', (e) => {
+                    if (draggingPointIndex >= 0) {
+                        // Check if the point is outside the viewport
+                        const vpRect = viewport.getBoundingClientRect();
+                        const point = intermediatePoints[draggingPointIndex];
+                        
+                        // Calculate if point is outside viewport boundaries
+                        const isOutside = 
+                            point.x < -20 || // Allow slight margin outside
+                            point.y < -20 || 
+                            point.x > vpRect.width + 20 || 
+                            point.y > vpRect.height + 20;
+                        
+                        if (isOutside) {
+                            // Remove the point from the array
+                            const removedPoint = intermediatePoints.splice(draggingPointIndex, 1)[0];
+                            
+                            // Remove the visual marker
+                            if (removedPoint.element) {
+                                removedPoint.element.remove();
+                            }
+                            
+                            // Update last modified index after deletion
+                            if (draggingPointIndex <= lastModifiedPointIndex) {
+                                lastModifiedPointIndex = Math.max(0, lastModifiedPointIndex - 1);
+                            }
+                            
+                            // Update counter
+                            updateWaypointCounter();
+                            
+                            // Reset dragging flag to allow immediate waypoint creation
+                            wasDraggingPoint = false;
+                            
+                            console.log('Waypoint deleted by dragging outside viewport');
+                        } else {
+                            // Point is still within viewport - update last modified
+                            lastModifiedPointIndex = draggingPointIndex;
+                            
+                            // Remove selected styling
+                            if (point && point.element) {
+                                point.element.classList.remove('selected');
+                            }
+                            
+                            // Constrain final position to within viewport
+                            point.x = Math.max(0, Math.min(point.x, vpRect.width));
+                            point.y = Math.max(0, Math.min(point.y, vpRect.height));
+                            
+                            // Update visual marker with constrained position
+                            if (point.element) {
+                                point.element.style.left = `${point.x}px`;
+                                point.element.style.top = `${point.y}px`;
+                            }
+                        }
+                        
+                        // Reset the dragging index
+                        draggingPointIndex = -1;
+                        selectedPointIndex = -1; // Clear selection
+                    }
+                });
+                
+                console.log("Waypoint controls set up - permanently in WAM mode");
+            }
 
             // --- Initial Call --- //
             initializeRects();
             renderSavedList();
             applyTheme(savedTheme);
             updateWaypointCounter(); // Set initial counter and Del button state
- 
-            addWaypointButton.textContent = 'Add'; // Force final state
-            console.log("End of DOMContentLoaded. Add button text:", addWaypointButton.textContent); // Final check
+            setupRotationControls(); // Set up rotation control event handlers
+            setupDurationControl(); // Set up duration control
+            setupViewportActions(); // Set up viewport action buttons
+            setupWaypointControls(); // Set up waypoint controls - will enable permanent WAM
+            
+            // No need to toggle WAM mode since we're always in WAM
+            // setTimeout(() => {
+            //     addWaypointButton.click();
+            //     console.log('Initialized in Waypoint Adding Mode');
+            // }, 500);
+            
+            // Add this listener if it was accidentally removed
+            themeToggleButton.addEventListener('click', () => {
+                console.log("Theme toggle clicked!"); // Check listener firing
+                const currentTheme = document.documentElement.classList.contains('dark-theme') ? 'dark' : 'light';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                applyTheme(newTheme);
+            });
  
         });
     </script>
