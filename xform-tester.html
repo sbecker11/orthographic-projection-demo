@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Test comment to verify file editing capabilities -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -7,12 +8,133 @@
     <script>
         // Inline script to set theme class ASAP to prevent flicker
         (function() {
-            const themeKey = 'transformTesterTheme';
+            const themeKey = 'xformTesterTheme';
             const savedTheme = localStorage.getItem(themeKey);
             if (savedTheme === 'dark') {
                 document.documentElement.classList.add('dark-theme');
             }
         })();
+        
+        // --- LocalStorage Keys (Global) ---
+        const STORAGE_KEY = 'xformTester_savedForms';
+        const STATE_STORAGE_KEY = 'xformTester_currentState';
+        
+        // --- Define global helper functions ---
+        window.getSavedXForms = function() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            return saved ? JSON.parse(saved) : [];
+        };
+        
+        window.saveXForms = function(xforms) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(xforms));
+        };
+        
+        // Last used directory for file operations
+        window.lastUsedDirHandle = null;
+        
+        // --- Define global element references ---
+        window.savedListUl = null; // Will be set after DOM is loaded
+        window.selectedControlsDiv = null;
+        window.renameInput = null;
+        window.selectedSavedXFormId = null;
+        window.intermediatePoints = [];
+        window.waypointCounter = null;
+        window.addWaypointButton = null;
+        window.deleteLastWaypointButton = null;
+        window.xRotationDirection = 1;
+        window.yRotationDirection = 1;
+        window.zRotationDirection = 1;
+        window.durationInput = null;
+        
+        // Define the makeDraggableWaypoint function on the window object
+        window.makeDraggableWaypoint = function(element, index) {
+            let isDragging = false;
+            
+            element.addEventListener('mousedown', (e) => {
+                // Remove this check to allow dragging in WAM mode
+                // if (isAddingPoints) return;
+                
+                isDragging = true;
+                window.draggingPointIndex = index;
+                lastModifiedPointIndex = index; // Update last modified point
+                wasDraggingPoint = false;
+                
+                // Get initial positions for drag calculation
+                const vpRect = viewport.getBoundingClientRect();
+                dragOffsetX = e.clientX - (vpRect.left + window.intermediatePoints[index].x);
+                dragOffsetY = e.clientY - (vpRect.top + window.intermediatePoints[index].y);
+                
+                // Select this point and deselect others
+                window.intermediatePoints.forEach((p, i) => {
+                    if (p.element) {
+                        if (i === index) {
+                            p.element.classList.add('selected');
+                        } else {
+                            p.element.classList.remove('selected');
+                        }
+                    }
+                });
+                
+                selectedPointIndex = index;
+                e.stopPropagation(); // Prevent viewport click
+                e.preventDefault();
+            });
+            
+            // Handle point movement in global mouse handlers
+        };
+        
+        // --- Global UI Helper Functions ---
+        window.renderSavedList = function() {
+            if (!window.savedListUl) {
+                console.error("Cannot render saved list - savedListUl not defined yet");
+                return;
+            }
+            
+            const xforms = window.getSavedXForms();
+            window.savedListUl.innerHTML = ''; // Clear existing list
+            window.selectedSavedXFormId = null; // Clear selection
+            window.selectedControlsDiv.style.display = 'none'; // Hide controls
+
+            if (xforms.length === 0) {
+                window.savedListUl.innerHTML = '<li>No X-Forms saved yet.</li>';
+                return;
+            }
+
+            xforms.forEach(t => {
+                const li = document.createElement('li');
+                li.dataset.id = t.id;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'xform-name';
+                nameSpan.textContent = t.name;
+                li.appendChild(nameSpan);
+
+                // Simple indication of complexity (optional)
+                const detailsSpan = document.createElement('span');
+                detailsSpan.style.fontSize = '0.8em';
+                detailsSpan.style.color = '#6c757d';
+                detailsSpan.textContent = `(${t.waypoints ? t.waypoints.length : 0} pts)`;
+                li.appendChild(detailsSpan);
+
+                li.addEventListener('click', () => {
+                    // Remove selected class from previous
+                    Array.from(window.savedListUl.querySelectorAll('li.selected')).forEach(el => el.classList.remove('selected'));
+
+                    // Toggle selection
+                    if (window.selectedSavedXFormId === t.id) {
+                        window.selectedSavedXFormId = null;
+                        window.selectedControlsDiv.style.display = 'none';
+                    } else {
+                        window.selectedSavedXFormId = t.id;
+                        li.classList.add('selected');
+                        window.renameInput.value = t.name; // Pre-fill rename input
+                        window.selectedControlsDiv.style.display = 'block';
+                        console.log('Selected saved X-Form:', t.id);
+                    }
+                });
+                window.savedListUl.appendChild(li);
+            });
+        };
     </script>
     <style>
         body {
@@ -193,14 +315,14 @@
             align-items: center;
             cursor: pointer;
         }
-        .saved-transitions li:hover {
+        .saved-xforms li:hover {
             background-color: #f8f9fa;
         }
-        .saved-transitions li.selected {
+        .saved-xforms li.selected {
             background-color: #e0e0e0;
             font-weight: bold;
         }
-        .transition-name {
+        .xform-name {
              flex-grow: 1;
              margin-right: 10px;
              overflow: hidden;
@@ -493,19 +615,60 @@
         <!-- Left: Persistence -->
         <div class="left-column persistence-column">
             <fieldset>
-                <legend>Saved Transitions</legend>
-                <ul id="savedList">
-                    <!-- Saved transitions will be listed here -->
-                    <li>No transitions saved yet.</li>
-                </ul>
-                <div class="control-group" id="selectedTransitionControls" style="display: none;">
-                    <input type="text" id="renameInput" placeholder="New name">
-                    <button id="renameTransition" class="secondary">Rename</button>
-                    <button id="deleteTransition" class="danger">Delete</button>
-                    <button id="replayTransition">Replay Selected</button>
+                <legend>X-Form Management</legend>
+                
+                <!-- Current X-Form Display -->
+                <div class="control-group" style="margin-bottom: 15px;">
+                    <div class="current-xform-header">
+                        <label>Current X-Form:</label>
+                        <span id="currentXFormName" style="font-weight: bold;"></span>
+                    </div>
+                    <div class="xform-rename-group" style="display: flex; margin-top: 8px;">
+                        <input type="text" id="renameXFormInput" placeholder="New name">
+                        <button id="renameXFormBtn" class="secondary">Rename</button>
+                    </div>
                 </div>
+                
+                <!-- Naming Convention -->
+                <div class="control-group" style="margin-bottom: 15px;">
+                    <label for="namingConvention">Naming Convention:</label>
+                    <select id="namingConvention" style="width: 100%; padding: 8px; margin-bottom: 5px;">
+                        <option value="datetime">Date & Time</option>
+                        <option value="numbered">Numbered (X-Form 1, 2, ...)</option>
+                        <option value="descriptive">Descriptive (New X-Form)</option>
+                    </select>
+                </div>
+                
+                <!-- File Operations -->
+                <div class="control-group" style="margin-bottom: 15px;">
+                    <div class="file-ops-buttons" style="display: flex; justify-content: space-between; gap: 5px;">
+                        <button id="saveToFileBtn" style="flex: 1;">Export to File</button>
+                        <button id="loadFromFileBtn" style="flex: 1;">Import from File</button>
+                    </div>
+                </div>
+                
+                <!-- Saved X-Forms List -->
+                <label for="savedList">Saved X-Forms:</label>
+                <ul id="savedList">
+                    <!-- Saved X-Forms will be listed here -->
+                    <li>No X-Forms saved yet.</li>
+                </ul>
+                
+                <!-- Selected X-Form Controls -->
+                <div class="control-group" id="selectedXFormControls" style="display: none; margin-top: 10px;">
+                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                        <button id="loadXForm" style="flex: 1;">Load</button>
+                        <button id="deleteXForm" class="danger" style="flex: 1;">Delete</button>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="renameInput" placeholder="New name">
+                        <button id="renameXForm" class="secondary">Rename</button>
+                    </div>
+                </div>
+                
+                <!-- Save Current Button -->
                 <div class="control-group" style="margin-top: 15px; text-align: center;">
-                    <button id="saveTransition">Save Current Configuration</button>
+                    <button id="saveXForm">Save Current X-Form</button>
                 </div>
             </fieldset>
         </div>
@@ -517,7 +680,7 @@
                 <!-- Rectangles will be added here by JS -->
             </div>
             <div class="viewport-actions">
-                <button id="startTransition">Start</button>
+                <button id="startAnimation">Play</button>
                 <button id="resetPositions">Reset</button>
             </div>
         </div>
@@ -568,7 +731,7 @@
                 <div class="control-group waypoint-controls">
                     <button id="addWaypointBtn" class="waypoint-btn">Add +</button>
                     <span id="waypointCounter">0</span>
-                    <button id="deleteLastWaypointBtn" class="danger waypoint-btn" disabled>- Del</button>
+                    <button id="deleteLastWaypointBtn" class="waypoint-btn" disabled>- Del</button>
                 </div>
             </div>
         </div>
@@ -578,31 +741,39 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOM Loaded. Initializing XForm Tester...');
 
+            // Set global DOM element references
+            window.addWaypointButton = document.getElementById('addWaypointBtn');
+            window.waypointCounter = document.getElementById('waypointCounter');
+            window.deleteLastWaypointButton = document.getElementById('deleteLastWaypointBtn');
+            window.savedListUl = document.getElementById('savedList');
+            window.selectedControlsDiv = document.getElementById('selectedXFormControls');
+            window.renameInput = document.getElementById('renameInput');
+
             // --- DOM Elements (Declare ONCE) ---
             const viewport = document.getElementById('viewport');
-            const addWaypointButton = document.getElementById('addWaypointBtn');
-            const waypointCounter = document.getElementById('waypointCounter');
-            const deleteLastWaypointButton = document.getElementById('deleteLastWaypointBtn');
-            console.log("Initial check - deleteLastWaypointButton element:", deleteLastWaypointButton); // Check if element exists
-            const widthInput = document.getElementById('rectWidth');
-            const heightInput = document.getElementById('rectHeight');
+            window.widthInput = document.getElementById('rectWidth');
+            window.heightInput = document.getElementById('rectHeight');
             const applySizeButton = document.getElementById('applySize');
-            const durationInput = document.getElementById('duration');
-            const startButton = document.getElementById('startTransition');
+            window.durationInput = document.getElementById('duration');
+            const startButton = document.getElementById('startAnimation');
             const resetButton = document.getElementById('resetPositions');
-            const savedListUl = document.getElementById('savedList');
-            const selectedControlsDiv = document.getElementById('selectedTransitionControls');
-            const renameInput = document.getElementById('renameInput');
-            const renameButton = document.getElementById('renameTransition');
-            const deleteButton = document.getElementById('deleteTransition');
-            const replaySavedButton = document.getElementById('replayTransition'); // In selected controls
-            const currentNameDisplay = document.getElementById('currentTransitionNameDisplay');
-            const editCurrentNameButton = document.getElementById('editCurrentNameBtn');
-            const editCurrentNameInput = document.getElementById('editCurrentNameInput');
-            const saveCurrentNameButton = document.getElementById('saveCurrentNameBtn');
-            const saveButton = document.getElementById('saveTransition'); // Main save button
-            const themeToggleButton = document.getElementById('themeToggle');
-            console.log("Initial check - themeToggleButton element:", themeToggleButton); // Check element selection
+            
+            // Set global references
+            window.selectedSavedXFormId = null;
+            window.renameXFormButton = document.getElementById('renameXFormBtn');
+            
+            const renameButton = document.getElementById('renameXForm');
+            const deleteButton = document.getElementById('deleteXForm');
+            const loadButton = document.getElementById('loadXForm');
+            const currentNameDisplay = document.getElementById('currentXFormName');
+            const renameXFormInput = document.getElementById('renameXFormInput');
+            const renameXFormButton = document.getElementById('renameXFormBtn');
+            const namingConventionSelect = document.getElementById('namingConvention');
+            const saveToFileButton = document.getElementById('saveToFileBtn');
+            const loadFromFileButton = document.getElementById('loadFromFileBtn');
+            const saveButton = document.getElementById('saveXForm'); // Main save button
+            window.themeToggleButton = document.getElementById('themeToggle');
+            console.log("Initial check - themeToggleButton element:", themeToggleButton);
 
             // NOTE: startRect and endRect are created dynamically, so use 'let'
             let startRect = null;
@@ -613,118 +784,621 @@
             let yRotationDirection = 1;
             let zRotationDirection = 1;
             let isAddingPoints = true; // Always in WAM mode
-            let intermediatePoints = []; // Array to store {x, y, element} of intermediate points
+            window.intermediatePoints = []; // Array to store {x, y, element} of intermediate points
             let selectedPointIndex = -1; // Index of the selected intermediate point
-            let draggingPointIndex = -1; // Index of the point being dragged
+            window.draggingPointIndex = -1; // Index of the point being dragged
             let lastModifiedPointIndex = -1; // Track most recently modified point
             let dragOffsetX = 0;
             let dragOffsetY = 0;
-            let selectedSavedTransitionId = null;
+            let selectedSavedXFormId = null;
             let wasDraggingPoint = false; // Flag to prevent click after drag
             let isRectangleDragging = false; // Flag to track rectangle dragging
 
-            // --- Current Transition State ---
-            let currentTransitionName = "New Transition";
-            let currentTransitionId = null; // Can be null (new) or a timestamp (run/loaded/saved)
-            let currentTransitionHasRun = false;
+            // --- Current X-Form State ---
+            let currentXFormName = "New X-Form";
+            let currentXFormId = null; // Can be null (new) or a timestamp (run/loaded/saved)
+            let currentXFormHasRun = false;
 
-            // --- LocalStorage Keys ---
-            const STORAGE_KEY = 'transformTester_savedTransitions';
-
-
-            // --- LocalStorage Helpers ---
-            function getSavedTransitions() {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                return saved ? JSON.parse(saved) : [];
-            }
-
-            function saveTransitions(transitions) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(transitions));
-            }
-
-            // --- Waypoint Counter Update --- //
-            function updateWaypointCounter() {
-                const count = intermediatePoints.length;
-                waypointCounter.textContent = count;
-                const isDisabled = count === 0;
+            // --- X-Form Naming Functions ---
+            function generateXFormName() {
+                const convention = namingConventionSelect.value;
                 
-                // Update the Delete button state
-                deleteLastWaypointButton.disabled = isDisabled;
+                switch(convention) {
+                    case 'datetime':
+                        const now = new Date();
+                        return `X-Form ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    
+                    case 'numbered':
+                        const xforms = window.getSavedXForms();
+                        return `X-Form ${xforms.length + 1}`;
+                    
+                    case 'descriptive':
+                    default:
+                        return 'New X-Form';
+                }
+            }
+            
+            // Validate and sanitize X-Form name
+            function sanitizeXFormName(name) {
+                if (!name || typeof name !== 'string') return generateXFormName();
                 
-                // Handle pointer events to prevent any mouse interaction when disabled
-                if (isDisabled) {
-                    deleteLastWaypointButton.style.pointerEvents = 'none';
-                    deleteLastWaypointButton.style.opacity = '0.5';
-                    deleteLastWaypointButton.style.cursor = 'not-allowed';
-                } else {
-                    deleteLastWaypointButton.style.pointerEvents = 'auto';
-                    deleteLastWaypointButton.style.opacity = '1';
-                    deleteLastWaypointButton.style.cursor = 'pointer';
+                // Remove any characters that might cause issues in filenames
+                let sanitized = name.trim()
+                    .replace(/[<>:"/\\|?*]/g, '')  // Remove invalid filename characters
+                    .replace(/\s+/g, ' ');         // Replace multiple spaces with single space
+                
+                // If empty after sanitizing, use generated name
+                if (sanitized.length === 0) return generateXFormName();
+                
+                // If name doesn't start with "X-Form", add it
+                if (!sanitized.toLowerCase().startsWith('x-form')) {
+                    sanitized = `X-Form ${sanitized}`;
                 }
                 
-                // Cap the maximum number of waypoints
-                addWaypointButton.disabled = count >= 99;
-                
-                console.log(`Waypoint counter updated: ${count} points`);
+                return sanitized;
             }
-
-            // --- Theming --- //
-            function applyTheme(theme) {
-                const htmlElement = document.documentElement; // Target <html> tag
-                if (theme === 'dark') {
-                    htmlElement.classList.add('dark-theme');
-                } else {
-                    htmlElement.classList.remove('dark-theme');
-                }
-                localStorage.setItem('transformTesterTheme', theme);
-            }
-
-            // --- Render Saved List ---
-            function renderSavedList() {
-                const transitions = getSavedTransitions();
-                savedListUl.innerHTML = ''; // Clear existing list
-                selectedSavedTransitionId = null; // Clear selection
-                selectedControlsDiv.style.display = 'none'; // Hide controls
-
-                if (transitions.length === 0) {
-                    savedListUl.innerHTML = '<li>No transitions saved yet.</li>';
-                    return;
-                }
-
-                transitions.forEach(t => {
-                    const li = document.createElement('li');
-                    li.dataset.id = t.id;
-
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'transition-name';
-                    nameSpan.textContent = t.name;
-                    li.appendChild(nameSpan);
-
-                    // Simple indication of complexity (optional)
-                    const detailsSpan = document.createElement('span');
-                    detailsSpan.style.fontSize = '0.8em';
-                    detailsSpan.style.color = '#6c757d';
-                    detailsSpan.textContent = `(${t.points.length} pts)`;
-                    li.appendChild(detailsSpan);
-
-                    li.addEventListener('click', () => {
-                        // Remove selected class from previous
-                        Array.from(savedListUl.querySelectorAll('li.selected')).forEach(el => el.classList.remove('selected'));
-
-                        // Toggle selection
-                        if (selectedSavedTransitionId === t.id) {
-                            selectedSavedTransitionId = null;
-                            selectedControlsDiv.style.display = 'none';
-                        } else {
-                            selectedSavedTransitionId = t.id;
-                            li.classList.add('selected');
-                            renameInput.value = t.name; // Pre-fill rename input
-                            selectedControlsDiv.style.display = 'block';
-                            console.log('Selected saved transition:', t.id);
+            
+            // --- X-Form File Operations ---
+            // Save X-Form to JSON file
+            async function saveXFormToFile() {
+                try {
+                    // Create the X-Form data object
+                    const xformData = createXFormDataObject();
+                    
+                    // Sanitize the filename
+                    const filename = `${sanitizeXFormName(currentXFormName).replace(/\s+/g, '_')}.json`;
+                    
+                    // Use the File System Access API to save the file
+                    const options = {
+                        suggestedName: filename,
+                        types: [{
+                            description: 'X-Form JSON',
+                            accept: {'application/json': ['.json']}
+                        }]
+                    };
+                    
+                    // If we have a previously used directory, start there
+                    if (window.lastUsedDirHandle) {
+                        try {
+                            options.startIn = window.lastUsedDirHandle;
+                        } catch (e) {
+                            console.error("Couldn't use last directory:", e);
                         }
+                    }
+                    
+                    const fileHandle = await window.showSaveFilePicker(options);
+                    
+                    // Save the directory for future use
+                    try {
+                        window.lastUsedDirHandle = await fileHandle.getParent();
+                        console.log("Saved directory for future use");
+                    } catch (e) {
+                        console.error("Couldn't save directory:", e);
+                    }
+                    
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(JSON.stringify(xformData, null, 2));
+                    await writable.close();
+                    
+                    console.log(`X-Form exported to file: ${filename}`);
+                    alert(`X-Form exported to file: ${filename}`);
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error saving X-Form to file:', error);
+                    if (error.name !== 'AbortError') {
+                        alert(`Error exporting X-Form: ${error.message || 'Unknown error'}`);
+                    }
+                    return false;
+                }
+            }
+            
+            // Load X-Form from JSON file
+            async function loadXFormFromFile() {
+                try {
+                    // File picker options
+                    const options = {
+                        types: [{
+                            description: 'X-Form JSON',
+                            accept: {'application/json': ['.json']}
+                        }]
+                    };
+                    
+                    // If we have a previously used directory, start there
+                    if (window.lastUsedDirHandle) {
+                        try {
+                            options.startIn = window.lastUsedDirHandle;
+                        } catch (e) {
+                            console.error("Couldn't use last directory:", e);
+                        }
+                    }
+                    
+                    // Use the File System Access API to open a file
+                    const [fileHandle] = await window.showOpenFilePicker(options);
+                    
+                    // Save the directory for future use
+                    try {
+                        window.lastUsedDirHandle = await fileHandle.getParent();
+                        console.log("Saved directory for future use");
+                    } catch (e) {
+                        console.error("Couldn't save directory:", e);
+                    }
+                    
+                    const file = await fileHandle.getFile();
+                    const contents = await file.text();
+                    const xformData = JSON.parse(contents);
+                    
+                    // Apply the loaded data
+                    applyXFormData(xformData);
+                    
+                    console.log(`X-Form imported from file: ${file.name}`);
+                    
+                    // Extract name from filename if not in the data
+                    if (!xformData.name) {
+                        const nameFromFile = file.name.replace(/\.json$/, '').replace(/_/g, ' ');
+                        currentXFormName = sanitizeXFormName(nameFromFile);
+                    }
+                    
+                    // Also save to local storage
+                    saveCurrentXFormToStorage();
+                    
+                    // Update UI
+                    updateCurrentXFormDisplay();
+                    window.renderSavedList();
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error loading X-Form from file:', error);
+                    if (error.name !== 'AbortError') {
+                        alert(`Error importing X-Form: ${error.message || 'Unknown error'}`);
+                    }
+                    return false;
+                }
+            }
+            
+            // Create a complete X-Form data object
+            function createXFormDataObject() {
+                return {
+                    name: currentXFormName,
+                    id: currentXFormId || Date.now(),
+                    timestamp: Date.now(),
+                    startRect: {
+                        left: startRect ? parseFloat(startRect.style.left) || 0 : 0,
+                        top: startRect ? parseFloat(startRect.style.top) || 0 : 0,
+                        width: parseInt(widthInput.value, 10),
+                        height: parseInt(heightInput.value, 10)
+                    },
+                    endRect: {
+                        left: endRect ? parseFloat(endRect.style.left) || 0 : 0,
+                        top: endRect ? parseFloat(endRect.style.top) || 0 : 0,
+                        width: parseInt(widthInput.value, 10),
+                        height: parseInt(heightInput.value, 10)
+                    },
+                    waypoints: window.intermediatePoints.map(point => ({
+                        x: point.x,
+                        y: point.y
+                    })),
+                    rotations: {
+                        x: xRotationDirection,
+                        y: yRotationDirection,
+                        z: zRotationDirection
+                    },
+                    duration: parseInt(window.durationInput.value, 10)
+                };
+            }
+            
+            // Apply loaded X-Form data to the application
+            function applyXFormData(data) {
+                // Set transition info
+                currentXFormName = data.name || "Loaded X-Form";
+                currentXFormId = data.id || Date.now();
+                currentXFormHasRun = true;
+                
+                // Set dimensions
+                if (data.startRect) {
+                    widthInput.value = data.startRect.width;
+                    heightInput.value = data.startRect.height;
+                    applyRectangleSize(); // Apply to both rectangles
+                }
+                
+                // Apply positions
+                if (startRect && data.startRect) {
+                    startRect.style.left = `${data.startRect.left}px`;
+                    startRect.style.top = `${data.startRect.top}px`;
+                }
+                
+                if (endRect && data.endRect) {
+                    endRect.style.left = `${data.endRect.left}px`;
+                    endRect.style.top = `${data.endRect.top}px`;
+                }
+                
+                // Clear existing waypoints
+                window.intermediatePoints.forEach(p => p.element && p.element.remove());
+                window.intermediatePoints = [];
+                
+                // Add new waypoints
+                if (data.waypoints && Array.isArray(data.waypoints)) {
+                    data.waypoints.forEach(point => {
+                        const marker = document.createElement('div');
+                        marker.className = 'point-marker';
+                        marker.style.left = `${point.x}px`;
+                        marker.style.top = `${point.y}px`;
+                        viewport.appendChild(marker);
+                        
+                        const pointData = { 
+                            x: point.x, 
+                            y: point.y, 
+                            element: marker 
+                        };
+                        window.intermediatePoints.push(pointData);
+                        
+                        window.makeDraggableWaypoint(marker, window.intermediatePoints.length - 1);
                     });
-                    savedListUl.appendChild(li);
+                }
+                
+                // Rotation settings
+                if (data.rotations) {
+                    xRotationDirection = data.rotations.x;
+                    yRotationDirection = data.rotations.y;
+                    zRotationDirection = data.rotations.z;
+                    updateRotationButtonsUI();
+                }
+                
+                // Set duration
+                if (data.duration) {
+                    window.durationInput.value = data.duration;
+                    if (document.getElementById('durationFeedback')) {
+                        const seconds = (data.duration / 1000).toFixed(1);
+                        document.getElementById('durationFeedback').textContent = `(${seconds}s)`;
+                    }
+                }
+                
+                // Update UI
+                window.updateWaypointCounter();
+                window.saveCurrentState(); // Save to localStorage
+            }
+            
+            // --- UI Updates for X-Form Management ---
+            function updateCurrentXFormDisplay() {
+                if (currentNameDisplay) {
+                    currentNameDisplay.textContent = currentXFormName || "New X-Form";
+                    renameXFormInput.value = currentXFormName || "";
+                }
+            }
+            
+            // --- X-Form Management UI Setup ---
+            function setupXFormManagement() {
+                // Initialize current X-Form display
+                updateCurrentXFormDisplay();
+                
+                // Pre-fill rename input with current name or generated name based on selected style
+                function updateRenameInputWithSuggestedName() {
+                    if (currentXFormName === "New X-Form" || !currentXFormName) {
+                        const suggestedName = generateXFormName();
+                        renameXFormInput.value = suggestedName;
+                    } else {
+                        renameXFormInput.value = currentXFormName;
+                    }
+                }
+                
+                // Initially fill the rename input
+                updateRenameInputWithSuggestedName();
+                
+                // Setup rename functionality
+                renameXFormButton.addEventListener('click', () => {
+                    const newName = sanitizeXFormName(renameXFormInput.value);
+                    currentXFormName = newName;
+                    updateCurrentXFormDisplay();
+                    saveCurrentState();
+                    
+                    // Update saved X-Form if this is an existing one
+                    if (currentXFormId) {
+                        const xforms = window.getSavedXForms();
+                        const index = xforms.findIndex(t => t.id === currentXFormId);
+                        if (index >= 0) {
+                            xforms[index].name = newName;
+                            window.saveXForms(xforms);
+                            window.renderSavedList();
+                        }
+                    }
+                    
+                    // Show confirmation
+                    const origText = renameXFormButton.textContent;
+                    renameXFormButton.textContent = "✓ Done";
+                    setTimeout(() => {
+                        renameXFormButton.textContent = origText;
+                    }, 1500);
                 });
+                
+                // Setup naming convention change handler
+                namingConventionSelect.addEventListener('change', () => {
+                    localStorage.setItem('xformTester_namingConvention', namingConventionSelect.value);
+                    
+                    // Generate new name suggestion
+                    updateRenameInputWithSuggestedName();
+                });
+                
+                // Load preferred naming convention from localStorage
+                const savedConvention = localStorage.getItem('xformTester_namingConvention');
+                if (savedConvention) {
+                    namingConventionSelect.value = savedConvention;
+                }
+                
+                // Setup file operation buttons
+                saveToFileButton.addEventListener('click', saveXFormToFile);
+                loadFromFileButton.addEventListener('click', loadXFormFromFile);
+                
+                // Update the load X-Form button
+                loadButton.addEventListener('click', () => {
+                    if (selectedSavedXFormId) {
+                        const xforms = window.getSavedXForms();
+                        const selected = xforms.find(t => t.id === selectedSavedXFormId);
+                        
+                        if (selected) {
+                            applyXFormData(selected);
+                            console.log(`Loaded X-Form: ${selected.name}`);
+                        }
+                    }
+                });
+                
+                // Helper function to save the current X-Form to storage
+                function saveCurrentXFormToStorage() {
+                    // Ensure we have a valid name and ID
+                    if (!currentXFormId) {
+                        currentXFormId = Date.now();
+                    }
+                    
+                    // If using time-based naming and we're generating a new name, update it
+                    if (namingConventionSelect.value === 'datetime' && 
+                        (currentXFormName === "New X-Form" || !currentXFormName)) {
+                        currentXFormName = generateXFormName();
+                        updateCurrentXFormDisplay();
+                        updateRenameInputWithSuggestedName();
+                    }
+                    
+                    // Create X-Form data object
+                    const xformData = createXFormDataObject();
+                    
+                    // Check if we're updating an existing X-Form
+                    const xforms = window.getSavedXForms();
+                    const existingIndex = xforms.findIndex(t => t.id === currentXFormId);
+                    
+                    if (existingIndex >= 0) {
+                        // Update existing
+                        xforms[existingIndex] = xformData;
+                    } else {
+                        // Add new
+                        xforms.push(xformData);
+                    }
+                    
+                    // Save to localStorage
+                    window.saveXForms(xforms);
+                    
+                    // Update the UI
+                    window.renderSavedList();
+                    return xformData;
+                }
+                
+                // Save X-Form button
+                saveButton.addEventListener('click', () => {
+                    const savedData = saveCurrentXFormToStorage();
+                    
+                    // Show confirmation
+                    const origText = saveButton.textContent;
+                    saveButton.textContent = "✓ Saved";
+                    setTimeout(() => {
+                        saveButton.textContent = origText;
+                    }, 1500);
+                    
+                    console.log(`X-Form saved: ${currentXFormName}`);
+                });
+                
+                // Rename button
+                renameButton.addEventListener('click', () => {
+                    if (selectedSavedXFormId) {
+                        const newName = sanitizeXFormName(renameInput.value);
+                        
+                        // Update in storage
+                        const xforms = window.getSavedXForms();
+                        const index = xforms.findIndex(t => t.id === selectedSavedXFormId);
+                        
+                        if (index >= 0) {
+                            xforms[index].name = newName;
+                            window.saveXForms(xforms);
+                            
+                            // Update UI
+                            window.renderSavedList();
+                            
+                            // If this is the current X-Form, update its name too
+                            if (currentXFormId === selectedSavedXFormId) {
+                                currentXFormName = newName;
+                                updateCurrentXFormDisplay();
+                                updateRenameInputWithSuggestedName();
+                            }
+                            
+                            console.log(`X-Form renamed to: ${newName}`);
+                        }
+                    }
+                });
+                
+                // Delete button
+                deleteButton.addEventListener('click', () => {
+                    if (selectedSavedXFormId) {
+                        if (confirm("Are you sure you want to delete this X-Form?")) {
+                            // Remove from storage
+                            const xforms = window.getSavedXForms();
+                            const filteredXforms = xforms.filter(t => t.id !== selectedSavedXFormId);
+                            window.saveXForms(filteredXforms);
+                            
+                            // Update UI
+                            window.renderSavedList();
+                            
+                            console.log(`X-Form deleted: ${selectedSavedXFormId}`);
+                        }
+                    }
+                });
+                
+                console.log('X-Form management UI setup complete');
+            }
+            
+            // --- State Management Functions ---
+            // Save current application state
+            window.saveCurrentState = function() {
+                // Create state object with all current settings
+                const state = {
+                    // Rectangle properties
+                    startRect: {
+                        left: startRect ? parseFloat(startRect.style.left) || 0 : 0,
+                        top: startRect ? parseFloat(startRect.style.top) || 0 : 0,
+                        width: startRect ? parseFloat(startRect.style.width) || parseInt(widthInput.value, 10) : parseInt(widthInput.value, 10),
+                        height: startRect ? parseFloat(startRect.style.height) || parseInt(heightInput.value, 10) : parseInt(heightInput.value, 10)
+                    },
+                    endRect: {
+                        left: endRect ? parseFloat(endRect.style.left) || 0 : 0,
+                        top: endRect ? parseFloat(endRect.style.top) || 0 : 0,
+                        width: endRect ? parseFloat(endRect.style.width) || parseInt(widthInput.value, 10) : parseInt(widthInput.value, 10),
+                        height: endRect ? parseFloat(endRect.style.height) || parseInt(heightInput.value, 10) : parseInt(heightInput.value, 10)
+                    },
+                    // Waypoints (without DOM elements)
+                    waypoints: window.intermediatePoints.map(point => ({
+                        x: point.x,
+                        y: point.y
+                    })),
+                    // Rotation settings
+                    rotations: {
+                        x: xRotationDirection,
+                        y: yRotationDirection,
+                        z: zRotationDirection
+                    },
+                    // Duration setting
+                    duration: parseInt(window.durationInput.value, 10),
+                    // Current X-Form info
+                    currentXForm: {
+                        name: currentXFormName,
+                        id: currentXFormId,
+                        hasRun: currentXFormHasRun
+                    },
+                    // Last modified point index
+                    lastModifiedPointIndex: lastModifiedPointIndex,
+                    // Theme
+                    theme: document.documentElement.classList.contains('dark-theme') ? 'dark' : 'light'
+                };
+                
+                // Store in localStorage
+                localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+                console.log('Current state saved to localStorage');
+            }
+            
+            // Restore application state from localStorage
+            function restoreState() {
+                const savedState = localStorage.getItem(STATE_STORAGE_KEY);
+                if (!savedState) {
+                    console.log('No saved state found, starting with default state');
+                    return false;
+                }
+                
+                try {
+                    const state = JSON.parse(savedState);
+                    console.log('Found saved state:', state); // Debug info
+                    
+                    // Restore rectangle dimensions in inputs
+                    if (state.startRect) {
+                        widthInput.value = state.startRect.width;
+                        heightInput.value = state.startRect.height;
+                    }
+                    
+                    // Apply settings to rects after they've been created
+                    if (startRect && state.startRect) {
+                        console.log('Restoring startRect position to:', 
+                                    `left=${state.startRect.left}px, top=${state.startRect.top}px`);
+                        startRect.style.left = `${state.startRect.left}px`;
+                        startRect.style.top = `${state.startRect.top}px`;
+                        startRect.style.width = `${state.startRect.width}px`;
+                        startRect.style.height = `${state.startRect.height}px`;
+                    }
+                    
+                    if (endRect && state.endRect) {
+                        console.log('Restoring endRect position to:',
+                                   `left=${state.endRect.left}px, top=${state.endRect.top}px`);
+                        endRect.style.left = `${state.endRect.left}px`;
+                        endRect.style.top = `${state.endRect.top}px`;
+                        endRect.style.width = `${state.endRect.width}px`;
+                        endRect.style.height = `${state.endRect.height}px`;
+                    }
+                    
+                    // Restore waypoints
+                    window.intermediatePoints = [];
+                    if (state.waypoints && Array.isArray(state.waypoints)) {
+                        state.waypoints.forEach(point => {
+                            // Create visual waypoint markers
+                            const marker = document.createElement('div');
+                            marker.className = 'point-marker';
+                            marker.style.left = `${point.x}px`;
+                            marker.style.top = `${point.y}px`;
+                            viewport.appendChild(marker);
+                            
+                            // Store waypoint data with DOM element reference
+                            const pointData = { 
+                                x: point.x, 
+                                y: point.y, 
+                                element: marker 
+                            };
+                            window.intermediatePoints.push(pointData);
+                            
+                            // Make marker draggable
+                            window.makeDraggableWaypoint(marker, window.intermediatePoints.length - 1);
+                        });
+                    }
+                    
+                    // Restore rotation settings
+                    if (state.rotations) {
+                        // Update both local and global rotation variables
+                        xRotationDirection = state.rotations.x;
+                        yRotationDirection = state.rotations.y;
+                        zRotationDirection = state.rotations.z;
+                        
+                        // Also update the global versions
+                        window.xRotationDirection = state.rotations.x;
+                        window.yRotationDirection = state.rotations.y;
+                        window.zRotationDirection = state.rotations.z;
+                        
+                        // Update active buttons
+                        updateRotationButtonsUI();
+                        console.log('Restored rotation settings:', state.rotations);
+                    }
+                    
+                    // Restore duration
+                    if (state.duration) {
+                        window.durationInput.value = state.duration;
+                    }
+                    
+                    // Restore current X-Form info
+                    if (state.currentXForm) {
+                        currentXFormName = state.currentXForm.name;
+                        currentXFormId = state.currentXForm.id;
+                        currentXFormHasRun = state.currentXForm.hasRun;
+                        updateCurrentXFormDisplay(); // Update UI with X-Form name
+                    }
+                    
+                    // Restore last modified point index
+                    if (typeof state.lastModifiedPointIndex !== 'undefined') {
+                        lastModifiedPointIndex = state.lastModifiedPointIndex;
+                    }
+                    
+                    // Restore theme
+                    if (state.theme) {
+                        applyTheme(state.theme);
+                    }
+                    
+                    // Update waypoint counter
+                    window.updateWaypointCounter();
+                    
+                    console.log('State successfully restored from localStorage');
+                    return true;
+                } catch (error) {
+                    console.error('Error restoring state:', error);
+                    return false;
+                }
             }
 
             // --- Bezier/Spline Calculation Helpers ---
@@ -820,12 +1494,12 @@
 
                 console.log('Rects Initialized at:', initialX, initialY);
                 // Clear old intermediate points
-                intermediatePoints.forEach(p => p.element.remove());
-                intermediatePoints = [];
+                window.intermediatePoints.forEach(p => p.element.remove());
+                window.intermediatePoints = [];
                 selectedPointIndex = -1;
                 isAddingPoints = false;
-                addWaypointButton.textContent = 'Add';
-                addWaypointButton.style.backgroundColor = '#28a745';
+                window.addWaypointButton.textContent = 'Add';
+                window.addWaypointButton.style.backgroundColor = '#28a745';
                 // Reset viewport cursor if it was crosshair
                 viewport.style.cursor = 'default';
 
@@ -833,10 +1507,10 @@
                  if (startRect) makeDraggable(startRect);
                  if (endRect) makeDraggable(endRect);
 
-                 // Reset current transition state
-                 currentTransitionName = "New Transition";
-                 currentTransitionId = null;
-                 currentTransitionHasRun = false;
+                 // Reset current X-Form state
+                 currentXFormName = "New X-Form";
+                 currentXFormId = null;
+                 currentXFormHasRun = false;
                  startButton.textContent = 'Play'; // Set button text
             }
 
@@ -895,6 +1569,13 @@
                         element.style.cursor = 'grab';
                         element.style.transition = ''; // Re-enable transition
                         console.log(`${element.id} Dropped at:`, element.style.left, element.style.top);
+                        
+                        // Immediately save state after rectangle is moved
+                        saveCurrentState();
+                        
+                        // Log current state to verify it's being saved
+                        console.log("Rectangle positions saved to localStorage:", 
+                            JSON.parse(localStorage.getItem(STATE_STORAGE_KEY)));
                     }
                 });
                  // Prevent dragging the element itself (browser default)
@@ -997,12 +1678,15 @@
                             // Update the corresponding rotation direction variable
                             if (axis === 'x') {
                                 xRotationDirection = value;
+                                window.xRotationDirection = value; // Update global variable
                                 console.log(`X rotation direction set to: ${value}`);
                             } else if (axis === 'y') {
                                 yRotationDirection = value;
+                                window.yRotationDirection = value; // Update global variable
                                 console.log(`Y rotation direction set to: ${value}`);
                             } else if (axis === 'z') {
                                 zRotationDirection = value;
+                                window.zRotationDirection = value; // Update global variable
                                 console.log(`Z rotation direction set to: ${value}`);
                             }
                             
@@ -1023,14 +1707,14 @@
                 const DEFAULT_DURATION = 500; // ms
                 
                 // Update input attributes to match constraints
-                durationInput.min = MIN_DURATION;
-                durationInput.max = MAX_DURATION;
-                durationInput.step = 50;
+                window.durationInput.min = MIN_DURATION;
+                window.durationInput.max = MAX_DURATION;
+                window.durationInput.step = 50;
                 
                 // Ensure initial value is within range
-                const initialValue = parseInt(durationInput.value, 10);
+                const initialValue = parseInt(window.durationInput.value, 10);
                 if (isNaN(initialValue) || initialValue < MIN_DURATION || initialValue > MAX_DURATION) {
-                    durationInput.value = DEFAULT_DURATION;
+                    window.durationInput.value = DEFAULT_DURATION;
                 }
                 
                 // Create and add duration feedback element
@@ -1039,11 +1723,11 @@
                 durationFeedback.style.marginLeft = '8px';
                 durationFeedback.style.fontSize = '0.9em';
                 durationFeedback.style.color = 'var(--text-color-secondary)';
-                durationInput.parentNode.appendChild(durationFeedback);
+                window.durationInput.parentNode.appendChild(durationFeedback);
                 
                 // Update feedback text
                 function updateDurationFeedback() {
-                    const value = parseInt(durationInput.value, 10);
+                    const value = parseInt(window.durationInput.value, 10);
                     if (!isNaN(value)) {
                         const seconds = (value / 1000).toFixed(1);
                         durationFeedback.textContent = `(${seconds}s)`;
@@ -1056,7 +1740,7 @@
                 
                 // Validate and correct input
                 function validateDuration() {
-                    let value = parseInt(durationInput.value, 10);
+                    let value = parseInt(window.durationInput.value, 10);
                     
                     if (isNaN(value)) {
                         value = DEFAULT_DURATION;
@@ -1066,8 +1750,8 @@
                     }
                     
                     // Update input if value changed
-                    if (value !== parseInt(durationInput.value, 10)) {
-                        durationInput.value = value;
+                    if (value !== parseInt(window.durationInput.value, 10)) {
+                        window.durationInput.value = value;
                     }
                     
                     updateDurationFeedback();
@@ -1075,8 +1759,8 @@
                 }
                 
                 // Event listeners
-                durationInput.addEventListener('change', validateDuration);
-                durationInput.addEventListener('input', updateDurationFeedback);
+                window.durationInput.addEventListener('change', validateDuration);
+                window.durationInput.addEventListener('input', updateDurationFeedback);
                 
                 // Initial feedback update
                 updateDurationFeedback();
@@ -1087,33 +1771,33 @@
             // --- Viewport Action Buttons Setup --- //
             function setupViewportActions() {
                 // Extract animation logic into a reusable function
-                function animateTransition() {
-                    console.log("Starting transition...");
+                function applyXFormAnimation() {
+                    console.log("Starting X-Form animation...");
                     
                     // Validate rectangle elements
-                    if (!startRect || !endRect) {
-                        console.error("Start/End rectangle elements not found!");
-                        return;
+                if (!startRect || !endRect) {
+                    console.error("Start/End rectangle elements not found!");
+                    return;
+                }
+
+                // Assign name/ID on first run if needed
+                if (!currentXFormHasRun) {
+                    if (currentXFormName === "New X-Form") {
+                        currentXFormId = Date.now();
+                        currentXFormName = `X-Form ${new Date(currentXFormId).toLocaleTimeString()}`;
                     }
-                    
-                    // Assign name/ID on first run if needed
-                    if (!currentTransitionHasRun) {
-                        if (currentTransitionName === "New Transition") {
-                            currentTransitionId = Date.now();
-                            currentTransitionName = `Transition ${new Date(currentTransitionId).toLocaleString()}`;
-                        }
-                        // If it has a custom name but no ID, assign ID now
-                        else if (!currentTransitionId) {
-                            currentTransitionId = Date.now();
-                        }
-                        currentTransitionHasRun = true;
-                    }
-                    
-                    // Update button text
+                     // If it has a custom name but no ID, assign ID now
+                     else if (!currentXFormId) {
+                          currentXFormId = Date.now();
+                     }
+                    currentXFormHasRun = true;
+                }
+
+                // Update button text
                     startButton.textContent = 'Play';
                     
                     // Get validated duration
-                    const duration = parseInt(durationInput.value, 10);
+                    const duration = parseInt(window.durationInput.value, 10);
                     const durationSeconds = Math.max(0.1, duration / 1000); // Ensure minimum duration
                     
                     // Reset rectangle state first
@@ -1122,72 +1806,72 @@
                     
                     // Small delay to ensure reset took effect
                     setTimeout(() => {
-                        // Get Start/End Positions relative to viewport
-                        const startRectBounds = startRect.getBoundingClientRect();
-                        const endRectBounds = endRect.getBoundingClientRect();
-                        const vpRect = viewport.getBoundingClientRect();
-                        
-                        const startLeft = startRectBounds.left - vpRect.left;
-                        const startTop = startRectBounds.top - vpRect.top;
-                        const endLeft = endRectBounds.left - vpRect.left;
-                        const endTop = endRectBounds.top - vpRect.top;
-                        
-                        // Calculate Translation
-                        const translateX = endLeft - startLeft;
-                        const translateY = endTop - startTop;
-                        
-                        // --- Intermediate Points & Keyframes ---
-                        const controlPoints = [
-                            { x: startLeft, y: startTop }, // Start point
-                            ...intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Intermediate points
-                            { x: endLeft, y: endTop } // End point
-                        ];
-                        
-                        // Generate a smooth path through the points
-                        const smoothPath = generateSplinePath(controlPoints);
-                        
+                // Get Start/End Positions relative to viewport
+                const startRectBounds = startRect.getBoundingClientRect();
+                const endRectBounds = endRect.getBoundingClientRect();
+                const vpRect = viewport.getBoundingClientRect();
+
+                const startLeft = startRectBounds.left - vpRect.left;
+                const startTop = startRectBounds.top - vpRect.top;
+                const endLeft = endRectBounds.left - vpRect.left;
+                const endTop = endRectBounds.top - vpRect.top;
+
+                // Calculate Translation
+                const translateX = endLeft - startLeft;
+                const translateY = endTop - startTop;
+
+                // --- Intermediate Points & Keyframes ---
+                 const controlPoints = [
+                    { x: startLeft, y: startTop }, // Start point
+                            ...window.intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Intermediate points
+                    { x: endLeft, y: endTop } // End point
+                 ];
+
+                 // Generate a smooth path through the points
+                 const smoothPath = generateSplinePath(controlPoints);
+
                         // Create keyframe animation for complex paths
                         if (smoothPath.length > 1) {
-                            const keyframesName = `pathAnimation_${Date.now()}`;
-                            let keyframesRule = `@keyframes ${keyframesName} {\n`;
-                            const numPathPoints = smoothPath.length - 1;
-                            
-                            // Generate keyframes based on the smooth path
-                            smoothPath.forEach((point, index) => {
-                                const percentage = (index / numPathPoints) * 100;
-                                // Translate relative to the *initial* start position
-                                const pointTranslateX = point.x - startLeft;
-                                const pointTranslateY = point.y - startTop;
-                                // Interpolate rotation based on overall percentage
-                                const rotateXValue = xRotationDirection * 360 * (percentage / 100);
-                                const rotateYValue = yRotationDirection * 360 * (percentage / 100);
-                                const rotateZValue = zRotationDirection * 360 * (percentage / 100);
-                                
-                                const transformValue = `translateX(${pointTranslateX}px) translateY(${pointTranslateY}px) rotateX(${rotateXValue}deg) rotateY(${rotateYValue}deg) rotateZ(${rotateZValue}deg)`;
-                                keyframesRule += `  ${percentage}% { transform: ${transformValue}; }\n`;
-                            });
-                            
-                            keyframesRule += `}`;
-                            
-                            // Inject keyframes into a style tag
-                            const styleSheet = document.createElement("style");
+                     const keyframesName = `pathAnimation_${Date.now()}`;
+                     let keyframesRule = `@keyframes ${keyframesName} {\n`;
+                     const numPathPoints = smoothPath.length - 1;
+
+                     // Generate keyframes based on the smooth path
+                     smoothPath.forEach((point, index) => {
+                         const percentage = (index / numPathPoints) * 100;
+                         // Translate relative to the *initial* start position
+                         const pointTranslateX = point.x - startLeft;
+                         const pointTranslateY = point.y - startTop;
+                         // Interpolate rotation based on overall percentage
+                         const rotateXValue = xRotationDirection * 360 * (percentage / 100);
+                         const rotateYValue = yRotationDirection * 360 * (percentage / 100);
+                         const rotateZValue = zRotationDirection * 360 * (percentage / 100);
+
+                         const transformValue = `translateX(${pointTranslateX}px) translateY(${pointTranslateY}px) rotateX(${rotateXValue}deg) rotateY(${rotateYValue}deg) rotateZ(${rotateZValue}deg)`;
+                         keyframesRule += `  ${percentage}% { transform: ${transformValue}; }\n`;
+                     });
+
+                     keyframesRule += `}`;
+
+                     // Inject keyframes into a style tag
+                     const styleSheet = document.createElement("style");
                             styleSheet.textContent = keyframesRule;
-                            document.head.appendChild(styleSheet);
-                            
-                            // Apply animation
+                     document.head.appendChild(styleSheet);
+
+                      // Apply animation
                             startRect.style.animation = `${keyframesName} ${durationSeconds}s ease-in-out forwards`; // Keep end state
-                            
-                            // Clean up style tag and animation property after completion
-                            setTimeout(() => {
-                                startRect.style.animation = '';
-                                startRect.style.transform = '';
+
+                      // Clean up style tag and animation property after completion
+                      setTimeout(() => {
+                          startRect.style.animation = '';
+                          startRect.style.transform = '';
                                 styleSheet.remove(); // Remove the style element when done
                             }, duration + 100); // Add small buffer for animation completion
-                        } else {
-                            // Fallback to simple transition if no intermediate points
-                            const transformValue = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
-                            startRect.style.transition = `transform ${durationSeconds}s ease-in-out`;
-                            startRect.style.transform = transformValue;
+                 } else {
+                      // Fallback to simple transition if no intermediate points
+                      const transformValue = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
+                      startRect.style.transition = `transform ${durationSeconds}s ease-in-out`;
+                      startRect.style.transform = transformValue;
                             
                             // Reset after transition
                             setTimeout(() => {
@@ -1200,7 +1884,7 @@
                 
                 // --- Start Button Event Handler ---
                 startButton.addEventListener('click', () => {
-                    animateTransition();
+                    applyXFormAnimation();
                 });
                 
                 // --- Reset Button Event Handler ---
@@ -1228,9 +1912,9 @@
             function setupWaypointControls() {
                 // Style Add button for permanent WAM mode
                 function styleAddButton() {
-                    addWaypointButton.textContent = 'Add +';
-                    addWaypointButton.style.backgroundColor = '#007bff'; // Standard button blue
-                    addWaypointButton.style.borderColor = '#0056b3'; // Darker blue border
+                    window.addWaypointButton.textContent = 'Add +';
+                    window.addWaypointButton.style.backgroundColor = '#007bff'; // Standard button blue
+                    window.addWaypointButton.style.borderColor = '#0056b3'; // Darker blue border
                     viewport.style.cursor = 'crosshair'; // Always show crosshair in viewport
                 }
                 
@@ -1249,16 +1933,16 @@
                     
                     // Store waypoint data
                     const pointData = { x, y, element: marker };
-                    intermediatePoints.push(pointData);
+                    window.intermediatePoints.push(pointData);
                     
                     // Set as the last modified point
-                    lastModifiedPointIndex = intermediatePoints.length - 1;
+                    lastModifiedPointIndex = window.intermediatePoints.length - 1;
                     
                     // Make marker draggable and selectable
-                    makeDraggableWaypoint(marker, intermediatePoints.length - 1);
+                    window.makeDraggableWaypoint(marker, window.intermediatePoints.length - 1);
                     
                     // Update counter and Del button state
-                    updateWaypointCounter();
+                    window.updateWaypointCounter();
                     
                     console.log(`Added waypoint at (${x}, ${y})`);
                     return pointData;
@@ -1266,18 +1950,18 @@
                 
                 // Function to delete the most recently modified waypoint
                 function deleteLastWaypoint() {
-                    if (intermediatePoints.length === 0) return;
+                    if (window.intermediatePoints.length === 0) return;
                     
                     // Determine which point to delete
-                    const indexToDelete = (lastModifiedPointIndex >= 0 && lastModifiedPointIndex < intermediatePoints.length) 
+                    const indexToDelete = (lastModifiedPointIndex >= 0 && lastModifiedPointIndex < window.intermediatePoints.length) 
                         ? lastModifiedPointIndex 
-                        : intermediatePoints.length - 1; // Fallback to last point
+                        : window.intermediatePoints.length - 1; // Fallback to last point
                     
                     // Get the point to delete
-                    const pointToDelete = intermediatePoints[indexToDelete];
+                    const pointToDelete = window.intermediatePoints[indexToDelete];
                     
                     // Remove the point from the array using splice
-                    intermediatePoints.splice(indexToDelete, 1);
+                    window.intermediatePoints.splice(indexToDelete, 1);
                     
                     // Remove the visual marker
                     if (pointToDelete.element) {
@@ -1285,12 +1969,12 @@
                     }
                     
                     // Update indexes after deletion
-                    if (lastModifiedPointIndex >= intermediatePoints.length) {
-                        lastModifiedPointIndex = intermediatePoints.length - 1;
+                    if (lastModifiedPointIndex >= window.intermediatePoints.length) {
+                        lastModifiedPointIndex = window.intermediatePoints.length - 1;
                     }
                     
                     // Update the counter and Del button state
-                    updateWaypointCounter();
+                    window.updateWaypointCounter();
                     
                     console.log(`Deleted waypoint at index ${indexToDelete}`);
                 }
@@ -1304,17 +1988,17 @@
                         // if (isAddingPoints) return;
                         
                         isDragging = true;
-                        draggingPointIndex = index;
+                        window.draggingPointIndex = index;
                         lastModifiedPointIndex = index; // Update last modified point
                         wasDraggingPoint = false;
                         
                         // Get initial positions for drag calculation
                         const vpRect = viewport.getBoundingClientRect();
-                        dragOffsetX = e.clientX - (vpRect.left + intermediatePoints[index].x);
-                        dragOffsetY = e.clientY - (vpRect.top + intermediatePoints[index].y);
+                        dragOffsetX = e.clientX - (vpRect.left + window.intermediatePoints[index].x);
+                        dragOffsetY = e.clientY - (vpRect.top + window.intermediatePoints[index].y);
                         
                         // Select this point and deselect others
-                        intermediatePoints.forEach((p, i) => {
+                        window.intermediatePoints.forEach((p, i) => {
                             if (p.element) {
                                 if (i === index) {
                                     p.element.classList.add('selected');
@@ -1330,6 +2014,12 @@
                     });
                     
                     // Handle point movement in global mouse handlers
+                }
+                
+                // Make waypoint draggable - use the global function directly
+                function makeDraggableWaypoint(element, index) {
+                    // Call the global window.makeDraggableWaypoint function instead
+                    return window.makeDraggableWaypoint(element, index);
                 }
                 
                 // Event: Viewport click to add waypoint
@@ -1354,13 +2044,13 @@
                 });
                 
                 // Event: Add button click
-                addWaypointButton.addEventListener('click', () => {
+                window.addWaypointButton.addEventListener('click', () => {
                     // Simply display a message in the console - button now only serves as a label
                     console.log('Add button clicked - you can click anywhere in the viewport to add waypoints');
                 });
                 
                 // Event: Delete last waypoint button
-                deleteLastWaypointButton.addEventListener('click', () => {
+                window.deleteLastWaypointButton.addEventListener('click', () => {
                     deleteLastWaypoint();
                 });
                 
@@ -1369,7 +2059,7 @@
                 
                 // Global mouse move for dragging waypoints
                 document.addEventListener('mousemove', (e) => {
-                    if (draggingPointIndex >= 0 && draggingPointIndex < intermediatePoints.length) {
+                    if (window.draggingPointIndex >= 0 && window.draggingPointIndex < window.intermediatePoints.length) {
                         wasDraggingPoint = true; // Set flag to prevent click after drag
                         
                         const vpRect = viewport.getBoundingClientRect();
@@ -1381,11 +2071,11 @@
                         // const constrainedY = Math.max(0, Math.min(newY, vpRect.height));
                         
                         // Update point position
-                        intermediatePoints[draggingPointIndex].x = newX;
-                        intermediatePoints[draggingPointIndex].y = newY;
+                        window.intermediatePoints[window.draggingPointIndex].x = newX;
+                        window.intermediatePoints[window.draggingPointIndex].y = newY;
                         
                         // Update visual marker
-                        const marker = intermediatePoints[draggingPointIndex].element;
+                        const marker = window.intermediatePoints[window.draggingPointIndex].element;
                         if (marker) {
                             marker.style.left = `${newX}px`;
                             marker.style.top = `${newY}px`;
@@ -1395,10 +2085,10 @@
                 
                 // Global mouse up to end waypoint dragging
                 document.addEventListener('mouseup', (e) => {
-                    if (draggingPointIndex >= 0) {
+                    if (window.draggingPointIndex >= 0) {
                         // Check if the point is outside the viewport
                         const vpRect = viewport.getBoundingClientRect();
-                        const point = intermediatePoints[draggingPointIndex];
+                        const point = window.intermediatePoints[window.draggingPointIndex];
                         
                         // Calculate if point is outside viewport boundaries
                         const isOutside = 
@@ -1409,7 +2099,7 @@
                         
                         if (isOutside) {
                             // Remove the point from the array
-                            const removedPoint = intermediatePoints.splice(draggingPointIndex, 1)[0];
+                            const removedPoint = window.intermediatePoints.splice(window.draggingPointIndex, 1)[0];
                             
                             // Remove the visual marker
                             if (removedPoint.element) {
@@ -1417,20 +2107,23 @@
                             }
                             
                             // Update last modified index after deletion
-                            if (draggingPointIndex <= lastModifiedPointIndex) {
+                            if (window.draggingPointIndex <= lastModifiedPointIndex) {
                                 lastModifiedPointIndex = Math.max(0, lastModifiedPointIndex - 1);
                             }
                             
                             // Update counter
-                            updateWaypointCounter();
+                            window.updateWaypointCounter();
                             
                             // Reset dragging flag to allow immediate waypoint creation
                             wasDraggingPoint = false;
                             
                             console.log('Waypoint deleted by dragging outside viewport');
+                            
+                            // Make sure we save the state AFTER the waypoint is removed
+                            window.saveCurrentState();
                         } else {
                             // Point is still within viewport - update last modified
-                            lastModifiedPointIndex = draggingPointIndex;
+                            lastModifiedPointIndex = window.draggingPointIndex;
                             
                             // Remove selected styling
                             if (point && point.element) {
@@ -1449,7 +2142,7 @@
                         }
                         
                         // Reset the dragging index
-                        draggingPointIndex = -1;
+                        window.draggingPointIndex = -1;
                         selectedPointIndex = -1; // Clear selection
                     }
                 });
@@ -1458,21 +2151,46 @@
             }
 
             // --- Initial Call --- //
+            
+            // Create base DOM elements
             initializeRects();
-            renderSavedList();
-            applyTheme(savedTheme);
-            updateWaypointCounter(); // Set initial counter and Del button state
+            
+            // Set up event handlers and controls (before state restoration)
             setupRotationControls(); // Set up rotation control event handlers
             setupDurationControl(); // Set up duration control
             setupViewportActions(); // Set up viewport action buttons
             setupWaypointControls(); // Set up waypoint controls - will enable permanent WAM
+            setupXFormManagement(); // Set up X-Form management UI
             
-            // No need to toggle WAM mode since we're always in WAM
-            // setTimeout(() => {
-            //     addWaypointButton.click();
-            //     console.log('Initialized in Waypoint Adding Mode');
-            // }, 500);
+            // Now restore state (will override initial values with saved ones)
+            const isStateRestored = restoreState();
             
+            // Apply duration feedback now that values are restored
+            if (document.getElementById('durationFeedback')) {
+                const value = parseInt(window.durationInput.value, 10);
+                if (!isNaN(value)) {
+                    const seconds = (value / 1000).toFixed(1);
+                    document.getElementById('durationFeedback').textContent = `(${seconds}s)`;
+                }
+            }
+            
+            // These functions use the restored state
+            window.renderSavedList();
+            
+            // Only apply theme from localStorage if we didn't restore it from state
+            if (!isStateRestored) {
+                applyTheme(savedTheme);
+            }
+            
+            // Update counters and UI after state is restored
+            window.updateWaypointCounter();
+            updateRotationButtonsUI(); // Ensure rotation buttons reflect the correct state
+            
+            // Finally, set up state persistence for future changes
+            setupStatePersistence();
+            
+            console.log("Application initialized" + (isStateRestored ? " with restored state" : " with default state"));
+
             // Add this listener if it was accidentally removed
             themeToggleButton.addEventListener('click', () => {
                 console.log("Theme toggle clicked!"); // Check listener firing
@@ -1482,6 +2200,208 @@
             });
  
         });
+
+        // Helper to update the rotation button UI based on current rotation settings
+        function updateRotationButtonsUI() {
+            // Update X rotation button UI
+            const xToggle = document.querySelector('.direction-toggle[data-axis="x"]');
+            if (xToggle) {
+                xToggle.setAttribute('data-direction', window.xRotationDirection);
+                const buttons = xToggle.querySelectorAll('.btn-dir');
+                buttons.forEach(button => {
+                    const value = parseInt(button.getAttribute('data-value'), 10);
+                    if (value === window.xRotationDirection) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                });
+            }
+            
+            // Update Y rotation button UI
+            const yToggle = document.querySelector('.direction-toggle[data-axis="y"]');
+            if (yToggle) {
+                yToggle.setAttribute('data-direction', window.yRotationDirection);
+                const buttons = yToggle.querySelectorAll('.btn-dir');
+                buttons.forEach(button => {
+                    const value = parseInt(button.getAttribute('data-value'), 10);
+                    if (value === window.yRotationDirection) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                });
+            }
+            
+            // Update Z rotation button UI
+            const zToggle = document.querySelector('.direction-toggle[data-axis="z"]');
+            if (zToggle) {
+                zToggle.setAttribute('data-direction', window.zRotationDirection);
+                const buttons = zToggle.querySelectorAll('.btn-dir');
+                buttons.forEach(button => {
+                    const value = parseInt(button.getAttribute('data-value'), 10);
+                    if (value === window.zRotationDirection) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                });
+            }
+        }
+        
+        // Register state-saving events
+        function setupStatePersistence() {
+            // Save on rectangle position changes (drag end) - Now handled directly in the drag function
+            
+            // Save on waypoint changes
+            const saveOnWaypointChange = () => setTimeout(window.saveCurrentState, 50);
+            viewport.addEventListener('click', (e) => {
+                // Save when a waypoint is added
+                if (e.target === viewport) {
+                    saveOnWaypointChange();
+                }
+            });
+            
+            // Save after waypoint dragging
+            document.addEventListener('mouseup', () => {
+                if (window.draggingPointIndex >= 0) {
+                    saveOnWaypointChange();
+                }
+            });
+            
+            // Save on Delete button click
+            if (window.deleteLastWaypointButton) {
+                window.deleteLastWaypointButton.addEventListener('click', saveOnWaypointChange);
+            }
+            
+            // Save on rotation changes
+            document.querySelectorAll('.direction-toggle .btn-dir').forEach(button => {
+                button.addEventListener('click', saveOnWaypointChange);
+            });
+            
+            // Save on duration changes
+            if (window.durationInput) {
+                window.durationInput.addEventListener('change', saveOnWaypointChange);
+            }
+            
+            // Save on rectangle dimension changes
+            if (window.widthInput) {
+                window.widthInput.addEventListener('change', saveOnWaypointChange);
+            }
+            if (window.heightInput) {
+                window.heightInput.addEventListener('change', saveOnWaypointChange);
+            }
+            
+            // Save on theme changes
+            if (window.themeToggleButton) {
+                window.themeToggleButton.addEventListener('click', saveOnWaypointChange);
+            }
+            
+            // Save on X-Form rename
+            if (window.renameXFormButton) {
+                window.renameXFormButton.addEventListener('click', saveOnWaypointChange);
+            }
+            
+            console.log('State persistence set up - changes will be automatically saved');
+        }
+
+        // --- Waypoint Counter Update --- //
+        function updateWaypointCounter() {
+            if (!window.intermediatePoints || !window.waypointCounter || !window.deleteLastWaypointButton || !window.addWaypointButton) {
+                console.error("Required global variables not defined for updateWaypointCounter");
+                return;
+            }
+            
+            const count = window.intermediatePoints.length;
+            window.waypointCounter.textContent = count;
+            const isDisabled = count === 0;
+            
+            // Update the Delete button state
+            window.deleteLastWaypointButton.disabled = isDisabled;
+            
+            // Handle pointer events to prevent any mouse interaction when disabled
+            if (isDisabled) {
+                window.deleteLastWaypointButton.style.pointerEvents = 'none';
+                window.deleteLastWaypointButton.style.opacity = '0.5';
+                window.deleteLastWaypointButton.style.cursor = 'not-allowed';
+            } else {
+                window.deleteLastWaypointButton.style.pointerEvents = 'auto';
+                window.deleteLastWaypointButton.style.opacity = '1';
+                window.deleteLastWaypointButton.style.cursor = 'pointer';
+            }
+            
+            // Cap the maximum number of waypoints
+            window.addWaypointButton.disabled = count >= 99;
+            
+            console.log(`Waypoint counter updated: ${count} points`);
+        }
+        
+        // Export function to global scope
+        window.updateWaypointCounter = updateWaypointCounter;
+
+        // --- Theming --- //
+        function applyTheme(theme) {
+            const htmlElement = document.documentElement; // Target <html> tag
+            if (theme === 'dark') {
+                htmlElement.classList.add('dark-theme');
+            } else {
+                htmlElement.classList.remove('dark-theme');
+            }
+            localStorage.setItem('xformTesterTheme', theme); // Updated key name
+        }
+
+        // --- Render Saved List ---
+        function renderSavedList() {
+            const xforms = window.getSavedXForms();
+            window.savedListUl.innerHTML = ''; // Clear existing list
+            window.selectedSavedXFormId = null; // Clear selection
+            window.selectedControlsDiv.style.display = 'none'; // Hide controls
+
+            if (xforms.length === 0) {
+                window.savedListUl.innerHTML = '<li>No X-Forms saved yet.</li>';
+                return;
+            }
+
+            xforms.forEach(t => {
+                const li = document.createElement('li');
+                li.dataset.id = t.id;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'xform-name';
+                nameSpan.textContent = t.name;
+                li.appendChild(nameSpan);
+
+                // Simple indication of complexity (optional)
+                const detailsSpan = document.createElement('span');
+                detailsSpan.style.fontSize = '0.8em';
+                detailsSpan.style.color = '#6c757d';
+                detailsSpan.textContent = `(${t.waypoints ? t.waypoints.length : 0} pts)`;
+                li.appendChild(detailsSpan);
+
+                li.addEventListener('click', () => {
+                    // Remove selected class from previous
+                    Array.from(window.savedListUl.querySelectorAll('li.selected')).forEach(el => el.classList.remove('selected'));
+
+                    // Toggle selection
+                    if (window.selectedSavedXFormId === t.id) {
+                        window.selectedSavedXFormId = null;
+                        window.selectedControlsDiv.style.display = 'none';
+                    } else {
+                        window.selectedSavedXFormId = t.id;
+                        li.classList.add('selected');
+                        window.renameInput.value = t.name; // Pre-fill rename input
+                        window.selectedControlsDiv.style.display = 'block';
+                        console.log('Selected saved X-Form:', t.id);
+                    }
+                });
+                window.savedListUl.appendChild(li);
+            });
+        }
+        
+        // Export function to global scope
+        window.renderSavedList = renderSavedList;
+        
+        // --- Bezier/Spline Calculation Helpers ---
     </script>
 </body>
 </html>
