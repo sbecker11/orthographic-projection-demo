@@ -518,7 +518,6 @@
             </div>
             <div class="viewport-actions">
                 <button id="startTransition">Start</button>
-                <button id="replayTransitionBtn">Replay</button>
                 <button id="resetPositions">Reset</button>
             </div>
         </div>
@@ -590,7 +589,6 @@
             const applySizeButton = document.getElementById('applySize');
             const durationInput = document.getElementById('duration');
             const startButton = document.getElementById('startTransition');
-            const replayButton = document.getElementById('replayTransitionBtn');
             const resetButton = document.getElementById('resetPositions');
             const savedListUl = document.getElementById('savedList');
             const selectedControlsDiv = document.getElementById('selectedTransitionControls');
@@ -623,6 +621,7 @@
             let dragOffsetY = 0;
             let selectedSavedTransitionId = null;
             let wasDraggingPoint = false; // Flag to prevent click after drag
+            let isRectangleDragging = false; // Flag to track rectangle dragging
 
             // --- Current Transition State ---
             let currentTransitionName = "New Transition";
@@ -838,7 +837,7 @@
                  currentTransitionName = "New Transition";
                  currentTransitionId = null;
                  currentTransitionHasRun = false;
-                 startButton.textContent = 'Start Transition'; // Reset button text
+                 startButton.textContent = 'Play'; // Set button text
             }
 
             // --- Dragging Logic ---
@@ -850,6 +849,7 @@
                     // Ensure element is valid
                     if (!element) return;
                     isDragging = true;
+                    isRectangleDragging = true; // Set global flag for rectangle dragging
                     element.style.cursor = 'grabbing';
                     element.style.transition = 'none'; // Disable transition during drag
 
@@ -891,6 +891,7 @@
                 document.addEventListener('mouseup', () => {
                     if (isDragging && element) {
                         isDragging = false;
+                        isRectangleDragging = false; // Reset global rectangle dragging flag
                         element.style.cursor = 'grab';
                         element.style.transition = ''; // Re-enable transition
                         console.log(`${element.id} Dropped at:`, element.style.left, element.style.top);
@@ -1086,8 +1087,8 @@
             // --- Viewport Action Buttons Setup --- //
             function setupViewportActions() {
                 // Extract animation logic into a reusable function
-                function animateTransition(isReplay = false) {
-                    console.log(`${isReplay ? "Replaying" : "Starting"} transition...`);
+                function animateTransition() {
+                    console.log("Starting transition...");
                     
                     // Validate rectangle elements
                     if (!startRect || !endRect) {
@@ -1096,7 +1097,7 @@
                     }
                     
                     // Assign name/ID on first run if needed
-                    if (!currentTransitionHasRun && !isReplay) {
+                    if (!currentTransitionHasRun) {
                         if (currentTransitionName === "New Transition") {
                             currentTransitionId = Date.now();
                             currentTransitionName = `Transition ${new Date(currentTransitionId).toLocaleString()}`;
@@ -1109,102 +1110,97 @@
                     }
                     
                     // Update button text
-                    startButton.textContent = 'Run Again';
+                    startButton.textContent = 'Play';
                     
                     // Get validated duration
                     const duration = parseInt(durationInput.value, 10);
                     const durationSeconds = Math.max(0.1, duration / 1000); // Ensure minimum duration
                     
-                    // Get Start/End Positions relative to viewport
-                    const startRectBounds = startRect.getBoundingClientRect();
-                    const endRectBounds = endRect.getBoundingClientRect();
-                    const vpRect = viewport.getBoundingClientRect();
+                    // Reset rectangle state first
+                    startRect.style.animation = '';
+                    startRect.style.transform = '';
                     
-                    const startLeft = startRectBounds.left - vpRect.left;
-                    const startTop = startRectBounds.top - vpRect.top;
-                    const endLeft = endRectBounds.left - vpRect.left;
-                    const endTop = endRectBounds.top - vpRect.top;
-                    
-                    // Calculate Translation
-                    const translateX = endLeft - startLeft;
-                    const translateY = endTop - startTop;
-                    
-                    // --- Intermediate Points & Keyframes ---
-                    const controlPoints = [
-                        { x: startLeft, y: startTop }, // Start point
-                        ...intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Intermediate points
-                        { x: endLeft, y: endTop } // End point
-                    ];
-                    
-                    // Generate a smooth path through the points
-                    const smoothPath = generateSplinePath(controlPoints);
-                    
-                    // Create keyframe animation for complex paths
-                    if (smoothPath.length > 1) {
-                        const keyframesName = `pathAnimation_${Date.now()}`;
-                        let keyframesRule = `@keyframes ${keyframesName} {\n`;
-                        const numPathPoints = smoothPath.length - 1;
+                    // Small delay to ensure reset took effect
+                    setTimeout(() => {
+                        // Get Start/End Positions relative to viewport
+                        const startRectBounds = startRect.getBoundingClientRect();
+                        const endRectBounds = endRect.getBoundingClientRect();
+                        const vpRect = viewport.getBoundingClientRect();
                         
-                        // Generate keyframes based on the smooth path
-                        smoothPath.forEach((point, index) => {
-                            const percentage = (index / numPathPoints) * 100;
-                            // Translate relative to the *initial* start position
-                            const pointTranslateX = point.x - startLeft;
-                            const pointTranslateY = point.y - startTop;
-                            // Interpolate rotation based on overall percentage
-                            const rotateXValue = xRotationDirection * 360 * (percentage / 100);
-                            const rotateYValue = yRotationDirection * 360 * (percentage / 100);
-                            const rotateZValue = zRotationDirection * 360 * (percentage / 100);
+                        const startLeft = startRectBounds.left - vpRect.left;
+                        const startTop = startRectBounds.top - vpRect.top;
+                        const endLeft = endRectBounds.left - vpRect.left;
+                        const endTop = endRectBounds.top - vpRect.top;
+                        
+                        // Calculate Translation
+                        const translateX = endLeft - startLeft;
+                        const translateY = endTop - startTop;
+                        
+                        // --- Intermediate Points & Keyframes ---
+                        const controlPoints = [
+                            { x: startLeft, y: startTop }, // Start point
+                            ...intermediatePoints.map(p => ({ x: p.x, y: p.y })), // Intermediate points
+                            { x: endLeft, y: endTop } // End point
+                        ];
+                        
+                        // Generate a smooth path through the points
+                        const smoothPath = generateSplinePath(controlPoints);
+                        
+                        // Create keyframe animation for complex paths
+                        if (smoothPath.length > 1) {
+                            const keyframesName = `pathAnimation_${Date.now()}`;
+                            let keyframesRule = `@keyframes ${keyframesName} {\n`;
+                            const numPathPoints = smoothPath.length - 1;
                             
-                            const transformValue = `translateX(${pointTranslateX}px) translateY(${pointTranslateY}px) rotateX(${rotateXValue}deg) rotateY(${rotateYValue}deg) rotateZ(${rotateZValue}deg)`;
-                            keyframesRule += `  ${percentage}% { transform: ${transformValue}; }\n`;
-                        });
-                        
-                        keyframesRule += `}`;
-                        
-                        // Inject keyframes into a style tag
-                        const styleSheet = document.createElement("style");
-                        styleSheet.textContent = keyframesRule;
-                        document.head.appendChild(styleSheet);
-                        
-                        // Apply animation
-                        startRect.style.animation = `${keyframesName} ${durationSeconds}s ease-in-out forwards`; // Keep end state
-                        
-                        // Clean up style tag and animation property after completion
-                        setTimeout(() => {
-                            startRect.style.animation = '';
-                            startRect.style.transform = '';
-                            styleSheet.remove(); // Remove the style element when done
-                        }, duration + 100); // Add small buffer for animation completion
-                    } else {
-                        // Fallback to simple transition if no intermediate points
-                        const transformValue = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
-                        startRect.style.transition = `transform ${durationSeconds}s ease-in-out`;
-                        startRect.style.transform = transformValue;
-                        
-                        // Reset after transition
-                        setTimeout(() => {
-                            startRect.style.transform = '';
-                            startRect.style.transition = '';
-                        }, duration + 100);
-                    }
+                            // Generate keyframes based on the smooth path
+                            smoothPath.forEach((point, index) => {
+                                const percentage = (index / numPathPoints) * 100;
+                                // Translate relative to the *initial* start position
+                                const pointTranslateX = point.x - startLeft;
+                                const pointTranslateY = point.y - startTop;
+                                // Interpolate rotation based on overall percentage
+                                const rotateXValue = xRotationDirection * 360 * (percentage / 100);
+                                const rotateYValue = yRotationDirection * 360 * (percentage / 100);
+                                const rotateZValue = zRotationDirection * 360 * (percentage / 100);
+                                
+                                const transformValue = `translateX(${pointTranslateX}px) translateY(${pointTranslateY}px) rotateX(${rotateXValue}deg) rotateY(${rotateYValue}deg) rotateZ(${rotateZValue}deg)`;
+                                keyframesRule += `  ${percentage}% { transform: ${transformValue}; }\n`;
+                            });
+                            
+                            keyframesRule += `}`;
+                            
+                            // Inject keyframes into a style tag
+                            const styleSheet = document.createElement("style");
+                            styleSheet.textContent = keyframesRule;
+                            document.head.appendChild(styleSheet);
+                            
+                            // Apply animation
+                            startRect.style.animation = `${keyframesName} ${durationSeconds}s ease-in-out forwards`; // Keep end state
+                            
+                            // Clean up style tag and animation property after completion
+                            setTimeout(() => {
+                                startRect.style.animation = '';
+                                startRect.style.transform = '';
+                                styleSheet.remove(); // Remove the style element when done
+                            }, duration + 100); // Add small buffer for animation completion
+                        } else {
+                            // Fallback to simple transition if no intermediate points
+                            const transformValue = `translateX(${translateX}px) translateY(${translateY}px) rotateX(${xRotationDirection*360}deg) rotateY(${yRotationDirection*360}deg) rotateZ(${zRotationDirection*360}deg)`;
+                            startRect.style.transition = `transform ${durationSeconds}s ease-in-out`;
+                            startRect.style.transform = transformValue;
+                            
+                            // Reset after transition
+                            setTimeout(() => {
+                                startRect.style.transform = '';
+                                startRect.style.transition = '';
+                            }, duration + 100);
+                        }
+                    }, 50);
                 }
                 
                 // --- Start Button Event Handler ---
                 startButton.addEventListener('click', () => {
-                    animateTransition(false);
-                });
-                
-                // --- Replay Button Event Handler ---
-                replayButton.addEventListener('click', () => {
-                    // Reset rectangle position before replay
-                    startRect.style.animation = '';
-                    startRect.style.transform = '';
-                    
-                    // Small delay before starting animation to ensure reset took effect
-                    setTimeout(() => {
-                        animateTransition(true);
-                    }, 50);
+                    animateTransition();
                 });
                 
                 // --- Reset Button Event Handler ---
@@ -1221,6 +1217,9 @@
                     
                     console.log("Viewport reset complete");
                 });
+                
+                // Update button text to "Play" instead of "Start"
+                startButton.textContent = 'Play';
                 
                 console.log("Viewport action buttons set up");
             }
@@ -1336,13 +1335,18 @@
                 // Event: Viewport click to add waypoint
                 viewport.addEventListener('click', (e) => {
                     // Don't add waypoint if we just finished dragging
-                    if (wasDraggingPoint) {
+                    if (wasDraggingPoint || isRectangleDragging) {
                         wasDraggingPoint = false;
                         return;
                     }
                     
                     // Also don't add waypoint if clicked on an existing waypoint
                     if (e.target.classList.contains('point-marker')) {
+                        return;
+                    }
+                    
+                    // Don't add waypoint if we clicked on a rectangle
+                    if (e.target === startRect || e.target === endRect) {
                         return;
                     }
                     
