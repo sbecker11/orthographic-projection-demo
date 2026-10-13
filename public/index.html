@@ -4,12 +4,112 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Point Rotation Demo</title>
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('orthoDemoTheme') === 'dark') {
+                    document.documentElement.classList.add('dark-theme');
+                }
+            } catch (e) {
+                console.error('[theme] Failed to read saved theme before paint', e);
+            }
+        })();
+    </script>
     <style>
+        :root {
+            color-scheme: light;
+            --bg-color-primary: #f0f0f0;
+            --bg-color-secondary: #ffffff;
+            --bg-color-inset: #eeeeee;
+            --bg-color-input: #ffffff;
+            --text-color-primary: #222222;
+            --text-color-secondary: #666666;
+            --border-color-strong: #cccccc;
+            --shadow-elevation-medium: 0 2px 4px rgba(0, 0, 0, 0.1);
+            --bg-color-toggle-off: #cccccc;
+            --bg-color-toggle-on: #4CAF50;
+            --bg-color-toggle-switch: #ffffff;
+        }
+        .dark-theme {
+            color-scheme: dark;
+            --bg-color-primary: #22272e;
+            --bg-color-secondary: #2d333b;
+            --bg-color-inset: #1c2128;
+            --bg-color-input: #22272e;
+            --text-color-primary: #cdd9e5;
+            --text-color-secondary: #97a6b7;
+            --border-color-strong: #586069;
+            --shadow-elevation-medium: 0 2px 4px rgba(0, 0, 0, 0.35);
+            --bg-color-toggle-off: #586069;
+            --bg-color-toggle-on: #4CAF50;
+            --bg-color-toggle-switch: #cdd9e5;
+        }
         body {
             margin: 0;
             padding: 20px;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            background-color: var(--bg-color-primary);
+            color: var(--text-color-primary);
+        }
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            max-width: 1600px;
+            margin: 0 auto 16px;
+        }
+        .page-header h1 {
+            margin: 0;
+            font-size: 1.6rem;
+        }
+        .theme-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .theme-control-label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        #themeToggle {
+            position: relative;
+            width: 60px;
+            height: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color-strong);
+            background-color: var(--bg-color-toggle-off);
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            box-sizing: border-box;
+            appearance: none;
+            padding: 0;
+            color: transparent;
+            font-size: 0;
+            line-height: 0;
+        }
+        #themeToggle::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: var(--bg-color-toggle-switch);
+            top: 1px;
+            left: 1px;
+            transition: transform 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        .dark-theme #themeToggle {
+            background-color: var(--bg-color-toggle-on);
+        }
+        .dark-theme #themeToggle::before {
+            transform: translateX(36px);
+        }
+        #themeToggle:focus-visible {
+            outline: 2px solid #4CAF50;
+            outline-offset: 2px;
         }
         .container {
             display: flex;
@@ -20,16 +120,15 @@
         .controls {
             flex: 1;
             padding: 20px;
-            background-color: white;
+            background-color: var(--bg-color-secondary);
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-elevation-medium);
             min-width: 250px;
         }
         .canvas-container {
-            flex: 2;
-            background-color: white;
+            background-color: #000000;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-elevation-medium);
             overflow: hidden;
             width: 500px;
             height: 500px;
@@ -53,7 +152,7 @@
         }
         .value-display {
             font-family: monospace;
-            color: #666;
+            color: var(--text-color-secondary);
             min-width: 4em;
             text-align: right;
         }
@@ -99,10 +198,13 @@
         }
         .text-input {
             padding: 8px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--border-color-strong);
             border-radius: 4px;
             font-size: 14px;
             width: 100%;
+            background-color: var(--bg-color-input);
+            color: var(--text-color-primary);
+            box-sizing: border-box;
         }
         .text-input:focus {
             border-color: #4CAF50;
@@ -121,10 +223,47 @@
         .control-button.secondary:hover {
             background-color: #616161;
         }
+        .affine-matrix-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .affine-matrix {
+            font-family: monospace;
+            padding: 10px;
+            background-color: var(--bg-color-inset);
+            color: var(--text-color-primary);
+            border-radius: 4px;
+        }
+        .matrix-values {
+            margin-bottom: 10px;
+            line-height: 1.2;
+        }
+        .matrix-cell {
+            display: inline-block;
+            min-width: 4em;
+            text-align: right;
+        }
+        .matrix-equations {
+            font-size: 0.9em;
+            color: var(--text-color-secondary);
+            line-height: 1.4;
+        }
+        .angle-values {
+            font-family: monospace;
+            font-size: 0.9em;
+            padding-top: 10px;
+        }
     </style>
 </head>
 <body>
-    <h1>Orthographic Projection Demo</h1>
+    <div class="page-header">
+        <h1>Orthographic Projection Demo</h1>
+        <div class="theme-control">
+            <span id="themeToggleLabel" class="theme-control-label">Dark mode</span>
+            <button id="themeToggle" type="button" title="Switch to dark mode" aria-label="Dark mode" aria-pressed="false"></button>
+        </div>
+    </div>
     <div class="container">
         <!-- Left Controls -->
         <div class="controls">
@@ -194,15 +333,15 @@
 
             <div class="control-group">
                 <h3>Affine Transformation Matrix</h3>
-                <div id="affineMatrixContainer" style="display: flex; align-items: flex-start; gap: 10px;">
-                    <div id="affineMatrix" style="font-family: monospace; padding: 10px; background-color: #eee; border-radius: 4px;">
+                <div id="affineMatrixContainer" class="affine-matrix-container">
+                    <div id="affineMatrix" class="affine-matrix">
                         <!-- The 2x2 matrix display -->
-                        <div style="margin-bottom: 10px; line-height: 1.2;">
-                            [ <span id="matrix-a" style="display: inline-block; min-width: 4em; text-align: right;">1.00</span>  <span id="matrix-c" style="display: inline-block; min-width: 4em; text-align: right;">0.00</span> ]<br>
-                            [ <span id="matrix-b" style="display: inline-block; min-width: 4em; text-align: right;">0.00</span>  <span id="matrix-d" style="display: inline-block; min-width: 4em; text-align: right;">1.00</span> ]
+                        <div class="matrix-values">
+                            [ <span id="matrix-a" class="matrix-cell">1.00</span>  <span id="matrix-c" class="matrix-cell">0.00</span> ]<br>
+                            [ <span id="matrix-b" class="matrix-cell">0.00</span>  <span id="matrix-d" class="matrix-cell">1.00</span> ]
                         </div>
                         <!-- The equations list -->
-                        <div style="font-size: 0.9em; color: #555; line-height: 1.4;">
+                        <div class="matrix-equations">
                             <b>a</b> = <span id="equation-a">cos(&theta;) + cos²(&phi;)(1-cos(&theta;))</span><br>
                             <b>b</b> = <span id="equation-b">cos(&phi;)sin(&phi;)(1-cos(&theta;))</span><br>
                             <b>c</b> = <span id="equation-c">cos(&phi;)sin(&phi;)(1-cos(&theta;))</span><br>
@@ -210,7 +349,7 @@
                         </div>
                     </div>
                     <!-- Angle values table -->
-                    <div id="angleValues" style="font-family: monospace; font-size: 0.9em; padding-top: 10px;">
+                    <div id="angleValues" class="angle-values">
                         <b>&phi;</b> = <span id="angle-phi">45</span>°<br>
                         <b>&theta;</b> = <span id="angle-theta">0</span>°
                     </div>

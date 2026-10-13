@@ -489,8 +489,55 @@ function createTextForPoint(point, index) {
     });
 }
 
+const THEME_STORAGE_KEY = 'orthoDemoTheme';
+
+function persistTheme(theme) {
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (e) {
+        console.error('[theme] Failed to save theme preference', e);
+        console.log('Remedy: Keeping the selected theme for this page view only');
+    }
+}
+
+function applyTheme(theme) {
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark-theme', isDark);
+    persistTheme(isDark ? 'dark' : 'light');
+
+    const button = document.getElementById('themeToggle');
+    if (!button) {
+        return;
+    }
+    button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+    button.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+}
+
+function initThemeToggle() {
+    const button = document.getElementById('themeToggle');
+    if (!button) {
+        throw new Error('[theme] Theme toggle button #themeToggle is missing');
+    }
+
+    let savedTheme = null;
+    try {
+        savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    } catch (e) {
+        console.error('[theme] Failed to read saved theme', e);
+        console.log('Remedy: Starting in light mode');
+    }
+    applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
+
+    button.addEventListener('click', function () {
+        const next = document.documentElement.classList.contains('dark-theme') ? 'light' : 'dark';
+        applyTheme(next);
+    });
+}
+
 // Wait for DOM to be ready before setting up event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    initThemeToggle();
+
     // Add event listeners
     document.getElementById('zoomFactor').addEventListener('input', updateZoom);
     document.getElementById('lineAngle').addEventListener('input', updateValues);
