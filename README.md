@@ -1,6 +1,12 @@
 # Orthographic Projection Demo
 
+<!-- SUMMARY:START generated from workspace-linkedin-profile/Projects.json by scripts/build_readme_header.py; edit there -->
+Orthographic projection demo for rotating 2D plane content around an in-plane axis, using Rodrigues rotation.
+
 **RunMe:** [https://sbecker11.github.io/orthographic-projection-demo/](https://sbecker11.github.io/orthographic-projection-demo/)
+
+**Skills:** Projective Geometry · Rodrigues Rotation · Computer Graphics · Three.js · JavaScript · Node.js · Express.js · HTML · CSS · Algorithms · Front-End Development · Automated Software Testing (JUnit/Jest/Vitest/PyTest)
+<!-- SUMMARY:END -->
 
 <img src="Orthographic-Projection-Demo.png" alt="Affine Transformation Demo" width="50%" />
 
