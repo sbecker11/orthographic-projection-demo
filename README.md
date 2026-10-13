@@ -1,8 +1,8 @@
 # Orthographic Projection Demo
 
-<a href="https://sbecker11.github.io/orthographic-projection-demo/" target="_blank" rel="noopener noreferrer"><img src="Orthographic-Projection-Demo.png" alt="Orthographic projection demo (click to open the live demo)" width="50%" /></a>
-
 <!-- SUMMARY:START generated from workspace-linkedin-profile/Projects.json by scripts/build_readme_header.py; edit there -->
+<a href="https://sbecker11.github.io/orthographic-projection-demo/" target="_blank" rel="noopener noreferrer"><img src="Orthographic-Projection-Demo.png" alt="Orthographic projection demo"></a>
+
 Orthographic projection demo for rotating 2D plane content around an in-plane axis, using Rodrigues rotation.
 
 **RunMe:** [https://sbecker11.github.io/orthographic-projection-demo/](https://sbecker11.github.io/orthographic-projection-demo/)
