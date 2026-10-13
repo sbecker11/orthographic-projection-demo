@@ -13,7 +13,7 @@ const renderer = new THREE.WebGLRenderer({
     antialias: true
 });
 renderer.setSize(WIDTH, HEIGHT);
-renderer.setClearColor(0x000000, 1);
+renderer.setClearColor(canvasClearColor(), 1);
 
 // Initialize camera with fixed aspect ratio
 const camera = new THREE.OrthographicCamera(
@@ -133,31 +133,8 @@ const textObjects = [];
 // Create text plane function
 function createTextSprite(text, x, y) {
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    const fontSize = 64;
-    context.font = `bold ${fontSize}px Arial`;
-    
-    // Measure text
-    const textMetrics = context.measureText(text);
-    const textWidth = textMetrics.width;
-    const textHeight = fontSize;
+    paintLabel(canvas, text);
 
-    // Set canvas size with padding
-    const padding = fontSize * 0.2;
-    canvas.width = textWidth + (padding * 2);
-    canvas.height = textHeight + (padding * 2);
-
-    // Clear background to transparent
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw text with bold font
-    context.font = `bold ${fontSize}px Arial`;
-    context.fillStyle = 'white';
-    context.textBaseline = 'middle'; // Center text vertically
-    context.textAlign = 'left';
-    context.fillText(text, padding, canvas.height / 2);
-
-    // Create texture
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
     texture.wrapS = THREE.ClampToEdgeWrapping;
@@ -179,8 +156,51 @@ function createTextSprite(text, x, y) {
     // Create mesh
     const textMesh = new THREE.Mesh(geometry, material);
     textMesh.position.set(x, y, 0);
-    
+    textMesh.userData.label = text;
+    textMesh.userData.textCanvas = canvas;
+
     return textMesh;
+}
+
+function canvasClearColor() {
+    return cssColor('--bg-color-primary', '#f0f0f0');
+}
+
+function textFillStyle() {
+    return cssColor('--text-color-primary', '#222222');
+}
+
+function cssColor(name, fallback) {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return value || fallback;
+}
+
+function paintLabel(canvas, text) {
+    const context = canvas.getContext('2d');
+    const fontSize = 64;
+    const padding = fontSize * 0.2;
+    context.font = `bold ${fontSize}px Arial`;
+    const textWidth = context.measureText(text).width;
+    canvas.width = textWidth + (padding * 2);
+    canvas.height = fontSize + (padding * 2);
+    context.font = `bold ${fontSize}px Arial`;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = textFillStyle();
+    context.textBaseline = 'middle';
+    context.textAlign = 'left';
+    context.fillText(text, padding, canvas.height / 2);
+}
+
+function repaintTextSprites() {
+    textObjects.forEach(textMesh => {
+        const canvas = textMesh.userData.textCanvas;
+        const label = textMesh.userData.label;
+        if (!canvas || !label || !textMesh.material.map) {
+            return;
+        }
+        paintLabel(canvas, label);
+        textMesh.material.map.needsUpdate = true;
+    });
 }
 
 // Function to add text, projected onto the rotated plane
@@ -504,6 +524,8 @@ function applyTheme(theme) {
     const isDark = theme === 'dark';
     document.documentElement.classList.toggle('dark-theme', isDark);
     persistTheme(isDark ? 'dark' : 'light');
+    renderer.setClearColor(canvasClearColor(), 1);
+    repaintTextSprites();
 
     const lightButton = document.getElementById('themeLight');
     const darkButton = document.getElementById('themeDark');
