@@ -1,6 +1,6 @@
 # Orthographic Projection Demo
 
-<img src="Orthographic-Projection-Demo.png" alt="Affine Transformation Demo" width="50%" />
+<a href="https://sbecker11.github.io/orthographic-projection-demo/" target="_blank" rel="noopener noreferrer"><img src="Orthographic-Projection-Demo.png" alt="Orthographic projection demo (click to open the live demo)" width="50%" /></a>
 
 <!-- SUMMARY:START generated from workspace-linkedin-profile/Projects.json by scripts/build_readme_header.py; edit there -->
 Orthographic projection demo for rotating 2D plane content around an in-plane axis, using Rodrigues rotation.
