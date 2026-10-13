@@ -1,6 +1,6 @@
 # Orthographic Projection Demo
 
-**Live demo:** https://sbecker11.github.io/orthographic-projection-demo/
+**RunMe:** [https://sbecker11.github.io/orthographic-projection-demo/](https://sbecker11.github.io/orthographic-projection-demo/)
 
 <img src="Orthographic-Projection-Demo.png" alt="Affine Transformation Demo" width="50%" />
 
