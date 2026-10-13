@@ -505,18 +505,21 @@ function applyTheme(theme) {
     document.documentElement.classList.toggle('dark-theme', isDark);
     persistTheme(isDark ? 'dark' : 'light');
 
-    const button = document.getElementById('themeToggle');
-    if (!button) {
-        return;
+    const lightButton = document.getElementById('themeLight');
+    const darkButton = document.getElementById('themeDark');
+    if (lightButton) {
+        lightButton.setAttribute('aria-pressed', isDark ? 'false' : 'true');
     }
-    button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-    button.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    if (darkButton) {
+        darkButton.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+    }
 }
 
 function initThemeToggle() {
-    const button = document.getElementById('themeToggle');
-    if (!button) {
-        throw new Error('[theme] Theme toggle button #themeToggle is missing');
+    const lightButton = document.getElementById('themeLight');
+    const darkButton = document.getElementById('themeDark');
+    if (!lightButton || !darkButton) {
+        throw new Error('[theme] Theme choice buttons #themeLight and #themeDark are missing');
     }
 
     let savedTheme = null;
@@ -528,9 +531,11 @@ function initThemeToggle() {
     }
     applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
 
-    button.addEventListener('click', function () {
-        const next = document.documentElement.classList.contains('dark-theme') ? 'light' : 'dark';
-        applyTheme(next);
+    lightButton.addEventListener('click', function () {
+        applyTheme('light');
+    });
+    darkButton.addEventListener('click', function () {
+        applyTheme('dark');
     });
 }
 

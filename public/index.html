@@ -21,28 +21,20 @@
             --bg-color-primary: #f0f0f0;
             --bg-color-secondary: #ffffff;
             --bg-color-inset: #eeeeee;
-            --bg-color-input: #ffffff;
             --text-color-primary: #222222;
             --text-color-secondary: #666666;
             --border-color-strong: #cccccc;
             --shadow-elevation-medium: 0 2px 4px rgba(0, 0, 0, 0.1);
-            --bg-color-toggle-off: #cccccc;
-            --bg-color-toggle-on: #4CAF50;
-            --bg-color-toggle-switch: #ffffff;
         }
         .dark-theme {
             color-scheme: dark;
             --bg-color-primary: #22272e;
             --bg-color-secondary: #2d333b;
             --bg-color-inset: #1c2128;
-            --bg-color-input: #22272e;
             --text-color-primary: #cdd9e5;
             --text-color-secondary: #97a6b7;
             --border-color-strong: #586069;
             --shadow-elevation-medium: 0 2px 4px rgba(0, 0, 0, 0.35);
-            --bg-color-toggle-off: #586069;
-            --bg-color-toggle-on: #4CAF50;
-            --bg-color-toggle-switch: #cdd9e5;
         }
         body {
             margin: 0;
@@ -66,48 +58,34 @@
         .theme-control {
             display: flex;
             align-items: center;
-            gap: 10px;
             flex-shrink: 0;
         }
-        .theme-control-label {
-            font-size: 14px;
-            font-weight: bold;
-        }
-        #themeToggle {
-            position: relative;
-            width: 60px;
-            height: 24px;
-            border-radius: 12px;
+        .theme-choice {
+            padding: 6px 14px;
             border: 1px solid var(--border-color-strong);
-            background-color: var(--bg-color-toggle-off);
+            background-color: var(--bg-color-secondary);
+            color: var(--text-color-primary);
             cursor: pointer;
-            transition: background-color 0.3s ease;
-            box-sizing: border-box;
-            appearance: none;
-            padding: 0;
-            color: transparent;
-            font-size: 0;
-            line-height: 0;
+            font-weight: bold;
+            font-size: 14px;
         }
-        #themeToggle::before {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background-color: var(--bg-color-toggle-switch);
-            top: 1px;
-            left: 1px;
-            transition: transform 0.3s ease;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        .theme-choice + .theme-choice {
+            margin-left: -1px;
         }
-        .dark-theme #themeToggle {
-            background-color: var(--bg-color-toggle-on);
+        #themeLight {
+            border-radius: 4px 0 0 4px;
         }
-        .dark-theme #themeToggle::before {
-            transform: translateX(36px);
+        #themeDark {
+            border-radius: 0 4px 4px 0;
         }
-        #themeToggle:focus-visible {
+        .theme-choice[aria-pressed="true"] {
+            background-color: #4CAF50;
+            border-color: #4CAF50;
+            color: #ffffff;
+            position: relative;
+            z-index: 1;
+        }
+        .theme-choice:focus-visible {
             outline: 2px solid #4CAF50;
             outline-offset: 2px;
         }
@@ -202,8 +180,10 @@
             border-radius: 4px;
             font-size: 14px;
             width: 100%;
-            background-color: var(--bg-color-input);
-            color: var(--text-color-primary);
+            color-scheme: light;
+            background-color: rgb(234, 234, 233);
+            color: #000000;
+            caret-color: #000000;
             box-sizing: border-box;
         }
         .text-input:focus {
@@ -259,9 +239,9 @@
 <body>
     <div class="page-header">
         <h1>Orthographic Projection Demo</h1>
-        <div class="theme-control">
-            <span id="themeToggleLabel" class="theme-control-label">Dark mode</span>
-            <button id="themeToggle" type="button" title="Switch to dark mode" aria-label="Dark mode" aria-pressed="false"></button>
+        <div class="theme-control" role="group" aria-label="Color theme">
+            <button id="themeLight" type="button" class="theme-choice" aria-pressed="true">Light</button>
+            <button id="themeDark" type="button" class="theme-choice" aria-pressed="false">Dark</button>
         </div>
     </div>
     <div class="container">
